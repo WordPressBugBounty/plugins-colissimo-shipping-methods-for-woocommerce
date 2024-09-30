@@ -2,8 +2,8 @@
 Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
-Tested up to: 6.4
-Stable tag: 2.1.0
+Tested up to: 6.6
+Stable tag: 2.2.0
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -58,6 +58,28 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 == Changelog ==
 
+= 2.2.0 =
+
+FONCTIONNALITÉS
+
+* Une nouvelle option vous permettant d'activer le retour sécurisé pour les étiquettes générées par vos clients a été ajoutée
+* La compatibilité avec l'extension WPC Product Bundles for WooCommerce a été ajoutée
+
+AMÉLIORATIONS
+
+* Les performances ont été améliorées pour les sites WordPress multisite
+* Les performances ont été améliorées globalement sur toutes les pages Colissimo
+* Le nom de la société est à présent ajouté dans la facture générée
+* Les commandes en brouillon sont maintenant cachées par défaut dans le listing Colissimo
+
+CORRECTIFS
+
+* Les emails de notification lorsqu'une étiquette est générée sont à présent envoyés dans la bonne langue lorsque WPML est installé
+* La purge des anciennes étiquettes a été corrigée pour les sites n'ayant pas l'option HPOS de WooCommerce activée
+* La livraison aux Emirats Arabes Unis a été corrigée lorsqu'aucun code postal n'est renseigné
+* L'expédition avec signature option DDP a été corrigée pour les pays autres que le Royaume-Uni pour les commandes de moins de 160€
+
+
 = 2.1.0 =
 
 FONCTIONNALITÉS
@@ -72,6 +94,7 @@ AMÉLIORATIONS
 * Le retour des colis pour la Norvège a été activé
 * Il n'est plus nécessaire d'avoir un numéro français pour les envois en point de retrait en France
 * La compatibilité avec Yith WooCommerce Multi Vendor a été améliorée pour les commandes en point de retrait
+* La plupart des appels d'API via SOAP ont été remplacés, et une meilleure gestion des erreurs a été ajoutée lorsque SOAP n'est pas disponible
 
 CORRECTIFS
 
