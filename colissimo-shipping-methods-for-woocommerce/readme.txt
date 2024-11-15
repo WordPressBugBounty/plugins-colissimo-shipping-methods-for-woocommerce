@@ -3,7 +3,7 @@ Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
 Tested up to: 6.6
-Stable tag: 2.2.0
+Stable tag: 2.3.0
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,26 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.3.0 =
+
+FONCTIONNALITÉS
+
+* Un nouveau bloc pour le suivi a été ajouté sur la page d'une commande dans le compte client
+* La colonne de suivi sur le listing des commandes client dépend désormais d'une option
+
+AMÉLIORATIONS
+
+* La carte des points de retrait avec Google Maps a été mise à jour afin d'être compatible avec leurs dernières fonctionnalités
+* Les textes relatifs à l'identifiant Colissimo ont été changés
+* Les options des réglages dépendant d'autres options s'affichent désormais uniquement lorsque nécessaire
+* La génération d'étiquettes retour par l'admin n'est plus possible lorsque le retour sécurisé est activé
+
+CORRECTIFS
+
+* Le chargement des traductions en français a été corrigé pour WordPress 6.7
+* Correction de certains cas où le point de retrait n'était pas bien sauvegardé lors d'une commande
+
 
 = 2.2.0 =
 
