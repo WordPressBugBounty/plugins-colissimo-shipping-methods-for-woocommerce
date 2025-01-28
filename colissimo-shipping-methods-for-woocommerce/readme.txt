@@ -2,8 +2,8 @@
 Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
-Tested up to: 6.6
-Stable tag: 2.3.0
+Tested up to: 6.7
+Stable tag: 2.4.0
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,22 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.4.0 =
+
+AMÉLIORATIONS
+
+* Les tarifs par défaut ont été mis à jour pour prendre ceux de 2025
+* La compatibilité avec PHP 8.4 a été ajoutée
+* L'extension est désormais compatible avec certaines extensions changeant le tunnel de commande en plusieurs étapes pour l'envoi en point de retrait
+* La mise à jour des statuts de livraison a été revue afin d'améliorer les performances
+* Ajout de la compatibilité avec une extension modifiant les fréquences des tâches planifiées de WordPress pour la mise à jour des statuts de livraison
+
+CORRECTIFS
+
+* L'enregistrement du point de retrait sélectionné a été améliorée pour certains cas spécifiques
+* Le nombre de jours par défaut n'était pas toujours bien sauvegardé pour la mise à jour automatique des statuts de livraison
+
 
 = 2.3.0 =
 
