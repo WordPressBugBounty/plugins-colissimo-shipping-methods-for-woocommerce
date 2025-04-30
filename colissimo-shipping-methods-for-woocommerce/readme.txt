@@ -2,8 +2,8 @@
 Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
-Tested up to: 6.7
-Stable tag: 2.4.0
+Tested up to: 6.8
+Stable tag: 2.5.0
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,30 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.5.0 =
+
+FONCTIONNALITÉS
+
+* L'option de filtre des types de point de retrait a été remplacée au profit d'une option plus complète
+* L'option FTD pour les DOM-TOM a été transformée en DDP, et une option supplémentaire a été ajoutée pour permettre la configuration d'un surcoût pour les DOM-TOM
+
+AMÉLIORATIONS
+
+* La compatibilité avec la la nouvelle méthode de gestion de la TVA a été ajoutée pour WooCommerce 9.7.0+
+* La compatibilité avec le plugin Chronopost a été ajoutée, ce dernier n'empêche plus le plugin Colissimo d'être activé
+* La compatibilité avec le nouvel éditeur d'emails avancé de WooCommerce a été ajoutée pour les emails Colissimo
+* De meilleures indications ont été ajoutées pour l'import des étiquettes depuis le listing des commandes Colissimo
+* Lorsque les logos transporteurs sont activés, le logo du partenaire local du pays de livraison est à présent affiché
+* Un lien a été ajouté dans les réglages pour vous permettre de vous rendre sur la page du matériel d'emballage Colissimo
+* Un formulaire de satisfation a été ajouté dans les réglages pour vous permettre de nous faire part de vos retours sur le module
+
+CORRECTIFS
+
+* Une erreur a été corrigée sur le système de gestion d'erreur intervenant lors de la génération par un client d'une étiquette de retour
+* Le texte "Note" dans l'email de suivi est à présent correctement traduit lorsqu'il est envoyé en anglais
+* Une sécurité a été ajoutée sur l'import des étiquettes depuis le listing des commandes Colissimo, lorsque le contenu importé est incorrect
+
 
 = 2.4.0 =
 
