@@ -3,7 +3,7 @@ Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
 Tested up to: 6.8
-Stable tag: 2.5.0
+Stable tag: 2.5.1
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,13 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.5.1 =
+
+CORRECTIFS
+
+* Une erreur a été corrigée lors de la validation d'une commande passée en point de retrait empêchant le remplacement de l'adresse du point sélectionné
+
 
 = 2.5.0 =
 
