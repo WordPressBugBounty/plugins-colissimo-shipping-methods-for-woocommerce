@@ -3,7 +3,7 @@ Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
 Tested up to: 6.8
-Stable tag: 2.5.1
+Stable tag: 2.5.2
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,13 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.5.2 =
+
+CORRECTIFS
+
+* L'affichage des points de retrait pour Google Maps et Leaflet est à présent fonctionnel lorsque la connexion au compte Colissimo se fait avec une clé d'application
+
 
 = 2.5.1 =
 
