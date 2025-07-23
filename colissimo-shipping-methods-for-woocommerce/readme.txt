@@ -3,7 +3,7 @@ Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
 Tested up to: 6.8
-Stable tag: 2.5.2
+Stable tag: 2.6.0
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,33 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.6.0 =
+
+FONCTIONNALITÉS
+
+* Il est à présent possible de conditionner les tranches de prix selon la catégorie des articles du panier
+* Un récapitulatif des options du compte Colissimo a été ajouté dans les réglages généraux
+* La compatibilité avec la méthode de paiement Up2Pay a été ajoutée pour les envois en point de retrait
+* La compatibilité avec Yith bundles a été ajoutée pour les paniers comportant au moins un bundle de produits
+* Une documentation complète a été rédigée, téléchargeable dans la partie support des réglages
+
+AMÉLIORATIONS
+
+* L'option d'affichage des points de retrait à l'international a été retirée, étant devenue obsolète
+* Le fichier de logs a été déplacé dans le dossier d'uploads de WordPress afin de pouvoir fonctionner avec certaines configurations serveur
+* Le point de retrait le plus proche est à présent automatiquement utilisé lors de la génération d'une étiquette lorsqu'un achat via Apple Pay express est effectué. Cette méthode de paiement en mode express redéfinissait la méthode de livraison, écrasant le point de retrait sélectionné par le client.
+
+CORRECTIFS
+
+* Des modifications ont été apportées sur la carte des points de retrait afin de gérer correctement l'affichage du widget Colissimo avec le bloc Gutenberg de checkout de WooCommerce
+* Les codes postaux comportant un tiret sont à présent gérés correctement lorsqu'une étiquette est générée
+* Pour les impressions thermiques, l'option de sélection du protocole HTTP/HTTPS a été corrigée, elle n'avait précédemment aucun effet.
+
+CORRECTIFS
+
+* L'affichage des points de retrait pour Google Maps et Leaflet est à présent fonctionnel lorsque la connexion au compte Colissimo se fait avec une clé d'application
+
 
 = 2.5.2 =
 
