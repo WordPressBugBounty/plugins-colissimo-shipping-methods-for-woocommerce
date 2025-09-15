@@ -3,7 +3,7 @@ Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
 Tested up to: 6.8
-Stable tag: 2.6.1
+Stable tag: 2.7.0
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,26 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.7.0 =
+
+FONCTIONNALITÉS
+
+* Il est à présent possible de choisir entre le service postal local et le transporteur partenaire pour les livraisons avec signature en Belgique
+* Une traduction de la documentation en anglais a été ajoutée
+
+AMÉLIORATIONS
+
+* Une nouvelle section dédiée au tunnel de commande a été ajoutée dans les réglages
+* Les informations affichées sur la page de suivi ne sont plus systématiquement en français, mais dans la langue du pays de livraison lorsque disponible ou en anglais sinon
+* Les expéditions vers les États-Unis ont été activées lorsque le DDP n'est pas utilisé (il vous est aussi à présent obligatoire de renseigner le code MID dans la description de chaque produit pour que les douanes américaines ne refusent pas le colis)
+* Certains appels aux APIs de Colissimo ont été optimisés afin d'améliorer les performances en réduisant le nombre d'appels
+
+CORRECTIFS
+
+* La génération automatique des étiquettes a été corrigées pour les commandes en point de retrait lorsque la mise à jour automatique des statuts de livraison est activée
+* Les informations du point de retrait sélectionné sont à présent enregistrées au niveau de la commande afin de mieux gérer des cas spécifiques liés à certaines méthodes de paiement comme Monetico, Up2Pay, Apple pay et PayPal
+
 
 = 2.6.1 =
 
