@@ -3,7 +3,7 @@ Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
 Tested up to: 6.8
-Stable tag: 2.7.1
+Stable tag: 2.8.2
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,44 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.8.2 =
+
+CORRECTIFS
+
+* Le téléchargement et l'impression des bordereaux de dépôt ont été corrigés lorsque le mode de connexion utilise une clé d'application
+
+
+= 2.8.1 =
+
+CORRECTIFS
+
+* L'encodage des images de l'extension a été corrigé
+
+
+= 2.8.0 =
+
+FONCTIONNALITÉS
+
+* Vous pouvez à présent catégoriser vos produits et catégories de produit pour les matières dangereuses si l'option est activée sur votre contrat Colissimo
+* Une fonctionnalité permettant l'affichage d'une estimation de la date de livraison dans le tunnel de commande a été ajoutée
+* De nouvelles options ont été ajoutées relatives aux livraisons en destination des USA
+
+AMÉLIORATIONS
+
+* Les options relatives au tunnel de commande ont été regroupées dans une seule section des réglages
+* La structure des fichiers de l'extension a été revue afin d'apporter une meilleure sécurité et stabilité
+* Les numéros de téléphone sont à présent gérés même si leur format n'est pas standard (nettoyage des espaces, points, tirets, etc...)
+
+CORRECTIFS
+
+* Le numéro de téléphone est à présent obligatoire pour les achats en mode express afin de ne plus bloquer les livraisons en point de retrait
+* Le point de retrait le plus proche est désormais sélectionné automatiquement lors d'un achat en mode express
+* Le bouton "Effectuer un retour" a été supprimé de la page de confirmation de commande
+* La recherche du widget Colissimo pour les points de retrait n'est plus bloquée si l'adresse de livraison n'est pas renseignée avant ouverture
+* Des préparatifs à PHP 8.5 ont été effectués, supprimant par la même occasion certains messages dans les logs serveur
+* Correction de la détection de l'emballage avancé concernant les dimensions de l'emballage
+
 
 = 2.7.1 =
 
