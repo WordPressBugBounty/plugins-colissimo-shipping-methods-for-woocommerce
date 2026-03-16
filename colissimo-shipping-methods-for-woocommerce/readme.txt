@@ -2,8 +2,8 @@
 Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 4.7
-Tested up to: 6.8
-Stable tag: 2.8.2
+Tested up to: 6.9
+Stable tag: 2.9.0
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,27 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.9.0 =
+
+AMÉLIORATIONS
+
+* Ajout d'un message informatif lorsque l'utilisateur importe des numéros de suivi avec un fichier n'ayant pas le bon format
+* Mise à jour des dernières versions compatibles pour WordPress et WooCommerce
+* La purge des anciennes étiquettes conserve désormais les numéros de suivi, et gère à présent bien les colis qui ne sont jamais détectés comme livrés
+* Les anciens bordereaux de dépôt sont désormais concernés par l'option de purge des anciennes étiquettes
+* Divers changements pour les matières dangereuses (textes dans les réglages, ajout d'un surcoût paramétrable, meilleure gestion du multi-catégorie)
+* Les messages de log sont à présent stockés en base de données
+* La date de création d'une étiquette est maintenant visible sur la page d'une commande
+
+CORRECTIFS
+
+* Une sécurité a été ajoutée sur l'utilisation de la session de WooCommerce (pour les points de retrait principalement)
+* La génération d'étiquettes a été corrigée pour les livraisons DOM vers Europe
+* Augmentation du temps alloué pour les appels aux API Colissimo et ajout de la possibilité de personnaliser avec un hook WordPress
+* Le numéro de portable est maintenant forcé pour la Belgique afin d'éviter un message d'erreur de l'API de génération d'étiquette
+* Un correctif a été appliqué pour l'envoi DDP au Royaume-Uni, où la catégorie d'envoi pour la douane n'était plus reconnue
+
 
 = 2.8.2 =
 
