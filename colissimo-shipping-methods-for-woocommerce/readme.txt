@@ -1,9 +1,9 @@
 === Colissimo Officiel : Méthodes de livraison pour WooCommerce ===
 Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
-Requires at least: 4.7
-Tested up to: 6.9
-Stable tag: 2.9.0
+Requires at least: 5.0
+Tested up to: 7.0
+Stable tag: 2.10.0
 Requires PHP: 7.4.0
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,36 @@ L’e-acheteur peut suivre sur son espace client le parcours de son colis et eff
 
 
 == Changelog ==
+
+= 2.10.0 =
+
+VULNERABILITÉ
+
+* Une vulnérabilité permettant l'accès non restreint aux grilles de prix d'envoi et à la méthode d'envoi d'une commande a été corrigée.
+Une refonte complète du système de routes a été opéré, et toutes les routes ont été vérifiées.
+
+FONCTIONNALITÉS
+
+* Il est maintenant possible de spécifier une description pour les produits à l'aide d'un attribut, qui sera utilisée pour la déclaration de douanes à la place du nom du produit
+* Les partenaires postaux suivants ont été ajoutés pour les livraisons avec signature : Danemark, Espagne, Estonie, Finlande, Pays-Bas, Pologne
+* Il est à présent possible de spécifier un code MID par produit en ajoutant un attribut. Le code MID est nécessaire pour les envois vers les États-Unis, et permet d'éviter que les douanes américaines refusent le colis
+
+AMÉLIORATIONS
+
+* La technique d'appel aux APIs de Colissimo a été améliorée et modernisée afin de ne plus dépendre d'une librairie.
+* La documentation développeur listant les hooks fournis a été mise à jour
+* Un changement interne permet l'utilisation de la fonctionnalité des produits sous dérogation pour les clients concernés
+* La fonctionnalité de date de livraison estimée a été modifiée afin de mieux prendre en compte le temps de préparation. Un temps de préparation par jour de la semaine a aussi été ajouté
+
+CORRECTIFS
+
+* La sécurité a été augmentée au niveau des logs de l'extension
+* Les caractères non latins sont à présent correctement gérés dans les noms des destinataires pour les étiquettes
+* La gestion des codes postaux a été revue pour ceux comprenant des lettres pour l'auto-complétion de la recherche des points de retrait
+* La liste des points de retrait est maintenant correctement adaptée dans le widget Colissimo pour les paniers de plus de 20kg
+* Dans le cas d'une adresse de livraison vide, la recherche pouvait ne pas fonctionner pour les points de retrait dans le widget Colissimo, c'est à présent corrigé
+* L'option de prise en compte du prix des produits virtuels/sans livraison dans le calcul des frais de port a été adaptée afin de fonctionner pour les dernières version de WooCommerce
+
 
 = 2.9.0 =
 
