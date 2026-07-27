@@ -1,0 +1,406 @@
+<?php
+
+namespace Colissimo\Classes\Settings;
+
+use Colissimo\Core\Ajax;
+use Colissimo\Helpers\Logger;
+use Colissimo\Helpers\Helper;
+use Colissimo\Core\Register;
+use Colissimo\Classes\Shipping\ShippingZones;
+use WC_Shipping_Zones;
+
+defined('ABSPATH') || die('Restricted Access');
+
+class ShippingRates {
+    const AJAX_TASK_NAME_EXPORT = 'shipping/export';
+    const AJAX_TASK_NAME_IMPORT = 'shipping/import';
+    const AJAX_TASK_NAME_DEFAULT_PRICES = 'shipping/default_prices';
+    const AJAX_TASK_NAME_SEARCH_CATEGORIES = 'shipping/lpc_search_categories';
+    const SHIPPING_RATES_COLUMNS = [
+        'min_weight',
+        'max_weight',
+        'min_price',
+        'max_price',
+        'shipping_class',
+        'product_category',
+        'price',
+    ];
+
+    /** @var Ajax */
+    protected $ajaxDispatcher;
+    /** @var ShippingZones */
+    protected $shippingZones;
+
+    public function __construct(
+        ?Ajax $ajaxDispatcher = null,
+        ?ShippingZones $shippingZones = null
+    ) {
+        $this->ajaxDispatcher = Register::get('ajaxDispatcher');
+        $this->shippingZones  = Register::get('shippingZones');
+    }
+
+    public function init() {
+        $this->listenToAjaxAction();
+    }
+
+    protected function listenToAjaxAction() {
+        $this->ajaxDispatcher->register(self::AJAX_TASK_NAME_EXPORT, [$this, 'export']);
+        $this->ajaxDispatcher->register(self::AJAX_TASK_NAME_IMPORT, [$this, 'import']);
+        $this->ajaxDispatcher->register(self::AJAX_TASK_NAME_DEFAULT_PRICES, [$this, 'defaultPrices']);
+        $this->ajaxDispatcher->register(self::AJAX_TASK_NAME_SEARCH_CATEGORIES, [$this, 'searchCategories']);
+    }
+
+    public function export() {
+        if (!current_user_can('lpc_manage_settings')) {
+            header('HTTP/1.0 401 Unauthorized');
+
+            return $this->ajaxDispatcher->makeAndLogError(
+                [
+                    'message' => 'Unauthorized access',
+                ]
+            );
+        }
+
+        $shippingMethod = WC_Shipping_Zones::get_shipping_method(Helper::getVar('method_id'));
+
+        $lines = [
+            self::SHIPPING_RATES_COLUMNS,
+        ];
+
+        $shippingRates = $shippingMethod->get_option('shipping_rates', []);
+        foreach ($shippingRates as $rate) {
+            $lines[] = [
+                $rate['min_weight'],
+                $rate['max_weight'] ?? '',
+                $rate['min_price'],
+                $rate['max_price'] ?? '',
+                empty($rate['shipping_class']) ? '' : implode(' ', $rate['shipping_class']),
+                empty($rate['product_category']) ? '' : implode(' ', $rate['product_category']),
+                $rate['price'],
+            ];
+        }
+
+        if (empty($shippingMethod->title)) {
+            $filename = 'Export rates Colissimo ' . gmdate('Y-m-d');
+        } else {
+            $filename = 'Export ' . $shippingMethod->title . ' ' . gmdate('Y-m-d');
+        }
+
+        // Fix for IE catching
+        header('Pragma: public');
+        header('Expires: 0');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+
+        // force download dialog
+        header('Content-Type: application/force-download');
+        header('Content-Type: application/octet-stream');
+        header('Content-Type: application/download');
+
+        // Set file name and force the browser to display the save dialog
+        header('Content-Disposition: attachment; filename=' . sanitize_file_name($filename . '.csv'));
+        header('Content-Transfer-Encoding: binary');
+
+        // phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- No WordPress equivalent for downloading files
+        $output = fopen('php://output', 'wb');
+        foreach ($lines as $line) {
+            fputcsv($output, $line, ',', '"', '');
+        }
+        fclose($output);
+        // phpcs:enable
+        exit;
+    }
+
+    public function import() {
+        if (!current_user_can('lpc_manage_settings')) {
+            header('HTTP/1.0 401 Unauthorized');
+
+            die(
+            json_encode(
+                [
+                    'type'    => 'error',
+                    'message' => 'Unauthorized access',
+                ]
+            )
+            );
+        }
+
+        if (!check_ajax_referer(self::AJAX_TASK_NAME_IMPORT, Ajax::NONCE_NAME, false)) {
+            die(
+            json_encode(
+                [
+                    'type'    => 'error',
+                    'message' => 'Unauthorized access',
+                ]
+            )
+            );
+        }
+
+        if (!isset($_FILES['lpc_shipping_rates_import']['name'])) {
+            die(json_encode(
+                [
+                    'type'    => 'error',
+                    'message' => __('File not found', 'colissimo-shipping-methods-for-woocommerce'),
+                ])
+            );
+        }
+
+        $uploadOverrides = [
+            'test_form' => false,
+            'mimes'     => ['csv' => 'text/csv'],
+        ];
+
+        $file = $_FILES['lpc_shipping_rates_import']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+        $file = wp_handle_upload($file, $uploadOverrides);
+
+        if (isset($file['error'])) {
+            die(json_encode(
+                [
+                    'type'    => 'error',
+                    'message' => $file['error'],
+                ])
+            );
+        }
+
+        try {
+            $fileContent = file_get_contents($file['file']);
+        } catch (Exception $exception) {
+            Logger::error($exception->getMessage());
+        }
+
+        if (empty($fileContent)) {
+            die(
+            json_encode(
+                [
+                    'type'    => 'error',
+                    'message' => __('The content of the file is empty', 'colissimo-shipping-methods-for-woocommerce'),
+                ]
+            )
+            );
+        }
+
+        $fileContent = str_replace("\r\n", "\n", $fileContent);
+        $lines       = explode("\n", $fileContent);
+        array_pop($lines);
+
+        $headers = explode(',', array_shift($lines));
+
+        if (!empty(array_diff($headers, self::SHIPPING_RATES_COLUMNS))) {
+            die(
+            json_encode(
+                [
+                    'type'    => 'error',
+                    'message' => __('Some columns are not allowed', 'colissimo-shipping-methods-for-woocommerce'),
+                ]
+            )
+            );
+        }
+
+        if (!in_array('min_weight', $headers) || !in_array('price', $headers)) {
+            die(
+            json_encode(
+                [
+                    'type'    => 'error',
+                    'message' => __('Please import at least a minimum weight and a price', 'colissimo-shipping-methods-for-woocommerce'),
+                ]
+            )
+            );
+        }
+
+        $rates = [];
+        foreach ($lines as $line) {
+            $rate    = [];
+            $newLine = explode(',', $line);
+            foreach ($headers as $key => $header) {
+                if (in_array($header, ['shipping_class', 'product_category'])) {
+                    $newValue = explode(' ', $newLine[$key]);
+                } else {
+                    $newValue = strlen($newLine[$key]) === 0 ? '' : (float) $newLine[$key];
+                }
+                $rate[$header] = $newValue;
+            }
+            $rates[] = $rate;
+        }
+
+        $shippingMethod = WC_Shipping_Zones::get_shipping_method(Helper::getVar('method_id'));
+        $optionName     = $shippingMethod->get_instance_option_key();
+        $currentOptions = get_option($optionName, []);
+
+        usort(
+            $rates,
+            function ($a, $b) {
+                $result = 0;
+
+                if ($a['price'] > $b['price']) {
+                    $result = 1;
+                } else {
+                    if ($a['price'] < $b['price']) {
+                        $result = - 1;
+                    }
+                }
+
+                return $result;
+            }
+        );
+
+        $currentOptions['shipping_rates'] = $rates;
+
+        if (update_option($optionName, $currentOptions, false)) {
+            die(json_encode(
+                [
+                    'type' => 'success',
+                ])
+            );
+        }
+
+        die(json_encode(
+            [
+                'type'    => 'error',
+                'message' => __('Error while saving imported rates', 'colissimo-shipping-methods-for-woocommerce'),
+            ])
+        );
+    }
+
+    public function defaultPrices() {
+        if (!current_user_can('lpc_manage_settings')) {
+            header('HTTP/1.0 401 Unauthorized');
+
+            return $this->ajaxDispatcher->makeAndLogError(
+                [
+                    'message' => 'Unauthorized access',
+                ]
+            );
+        }
+
+        $response = [
+            'type'    => 'error',
+            'message' => '',
+            'data'    => [],
+        ];
+
+        $instanceId     = intval(Helper::getVar('instance_id'));
+        $shippingMethod = WC_Shipping_Zones::get_shipping_method($instanceId);
+        $currentZone    = WC_Shipping_Zones::get_zone_by('instance_id', $instanceId);
+
+        if (empty($shippingMethod) || empty($currentZone)) {
+            $response['message'] = __('Zone not found', 'colissimo-shipping-methods-for-woocommerce');
+            echo json_encode($response);
+            exit;
+        }
+
+        $zoneName = $currentZone->get_zone_name();
+
+        $zoneKey = null;
+
+        $capabilities = Helper::get_option('lpc_capabilities_per_country_fr', []);
+        foreach ($capabilities as $key => $zone) {
+            if ($zone['name'] === $zoneName) {
+                $zoneKey = $key;
+                break;
+            }
+        }
+
+        if (empty($zoneKey)) {
+            $currentZoneCountries = array_map(
+                fn($country) => $country->code,
+                array_filter(
+                    $currentZone->get_zone_locations(),
+                    fn($location) => 'country' === $location->type
+                )
+            );
+
+            foreach ($capabilities as $key => $zone) {
+                if (!empty(array_intersect($currentZoneCountries, array_keys($zone['countries'])))) {
+                    $zoneKey = $key;
+                    break;
+                }
+            }
+
+            if (empty($zoneKey)) {
+                $response['message'] = __('Current zone countries not eligible to Colissimo shipping', 'colissimo-shipping-methods-for-woocommerce');
+                echo json_encode($response);
+                exit;
+            }
+        }
+
+        $defaultPrices = json_decode(
+            file_get_contents($this->shippingZones::DEFAULT_PRICES_PER_ZONE_JSON_FILE),
+            true
+        );
+
+        $methodKey = 'lpc_expert' === $shippingMethod->id ? 'lpc_sign' : $shippingMethod->id;
+        if (empty($defaultPrices[$zoneKey][$methodKey])) {
+            $response['message'] = __('This shipping method isn\'t available for this zone', 'colissimo-shipping-methods-for-woocommerce');
+        } else {
+            $response['type']           = 'success';
+            $response['data']['prices'] = $defaultPrices[$zoneKey][$methodKey];
+            $weightUnit                 = Helper::get_option('woocommerce_weight_unit', 'kg');
+
+            foreach ($response['data']['prices'] as $key => $price) {
+                // Cast to string because PHP messes up the float values with json_encode
+                $response['data']['prices'][$key]['weight_min'] = (string) wc_get_weight($price['weight_min'], $weightUnit, 'g');
+                $response['data']['prices'][$key]['weight_max'] = (string) wc_get_weight($price['weight_max'], $weightUnit, 'g');
+            }
+        }
+        echo json_encode($response);
+        exit;
+    }
+
+    public function searchCategories(): void {
+        if (!current_user_can('lpc_manage_settings')) {
+            header('HTTP/1.0 401 Unauthorized');
+
+            wp_send_json(
+                [
+                    'results' => [],
+                    'more'    => false,
+                ]
+            );
+        }
+
+        $search = Helper::getVar('search');
+        $page   = Helper::getVar('page', 1);
+
+        $categories = get_terms(
+            [
+                'taxonomy'   => 'product_cat',
+                'hide_empty' => false,
+                'search'     => $search,
+                'number'     => 20,
+                'offset'     => ($page - 1) * 20,
+            ]
+        );
+
+        $results = [];
+        if (!empty($categories) && !is_wp_error($categories)) {
+            foreach ($categories as $category) {
+                $results[] = [
+                    'id'   => $category->term_id,
+                    'text' => $category->name,
+                ];
+            }
+        }
+
+        wp_send_json(
+            [
+                'results' => $results,
+                'more'    => count($categories) >= 20,
+            ]
+        );
+    }
+
+    public function getUrlExport($shippingMethodId) {
+        return $this->ajaxDispatcher->getUrlForTask(self::AJAX_TASK_NAME_EXPORT) . '&method_id=' . $shippingMethodId;
+    }
+
+    public function getUrlImport($shippingMethodId) {
+        return $this->ajaxDispatcher->getUrlForTask(self::AJAX_TASK_NAME_IMPORT) . '&method_id=' . $shippingMethodId;
+    }
+
+    public function getUrlDefaultPrices($shippingMethodId) {
+        return $this->ajaxDispatcher->getUrlForTask(self::AJAX_TASK_NAME_DEFAULT_PRICES) . '&instance_id=' . $shippingMethodId;
+    }
+
+    public function getUrlSearchCategories() {
+        return $this->ajaxDispatcher->getUrlForTask(self::AJAX_TASK_NAME_SEARCH_CATEGORIES);
+    }
+}

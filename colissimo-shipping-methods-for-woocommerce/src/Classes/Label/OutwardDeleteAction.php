@@ -1,0 +1,184 @@
+<?php
+
+namespace Colissimo\Classes\Label;
+
+use Colissimo\Classes\Settings\AdminNotices;
+use Colissimo\Core\Ajax;
+use Colissimo\Helpers\Logger;
+use Colissimo\Helpers\Helper;
+use Colissimo\Core\Register;
+
+defined('ABSPATH') || die('Restricted Access');
+
+class OutwardDeleteAction {
+    const AJAX_TASK_NAME = 'label/outward/delete';
+    const TRACKING_NUMBER_VAR_NAME = 'lpc_label_tracking_number';
+    const REDIRECTION_VAR_NAME = 'lpc_redirection';
+
+    /** @var Ajax */
+    protected $ajaxDispatcher;
+    /** @var OutwardLabelDb */
+    protected $outwardLabelDb;
+    /** @var AdminNotices */
+    protected $adminNotices;
+    /** @var InwardLabelDb */
+    protected $inwardLabelDb;
+
+    public function __construct(
+        ?Ajax $ajaxDispatcher = null,
+        ?OutwardLabelDb $outwardLabelDb = null,
+        ?InwardLabelDb $inwardLabelDb = null,
+        ?AdminNotices $adminNotices = null
+    ) {
+        $this->ajaxDispatcher = Register::get('ajaxDispatcher');
+        $this->outwardLabelDb = Register::get('outwardLabelDb');
+        $this->inwardLabelDb  = Register::get('inwardLabelDb');
+        $this->adminNotices   = Register::get('lpcAdminNotices');
+    }
+
+    public function init() {
+        $this->listenToAjaxAction();
+    }
+
+    protected function listenToAjaxAction() {
+        $this->ajaxDispatcher->register(self::AJAX_TASK_NAME, [$this, 'control']);
+    }
+
+    public function getUrlForTrackingNumber($trackingNumber, $redirection) {
+        return $this->ajaxDispatcher->getUrlForTask(self::AJAX_TASK_NAME)
+               . '&' . self::TRACKING_NUMBER_VAR_NAME . '=' . $trackingNumber
+               . '&' . self::REDIRECTION_VAR_NAME . '=' . $redirection;
+    }
+
+    public function control() {
+        if (!current_user_can('lpc_delete_labels')) {
+            header('HTTP/1.0 401 Unauthorized');
+
+            return $this->ajaxDispatcher->makeAndLogError(
+                [
+                    'message' => 'unauthorized access to outward label deletion',
+                ]
+            );
+        }
+
+        $trackingNumber      = Helper::getVar(self::TRACKING_NUMBER_VAR_NAME);
+        $redirection         = Helper::getVar(self::REDIRECTION_VAR_NAME);
+        $inwardLabelsRelated = $this->inwardLabelDb->getLabelsInfosForOutward($trackingNumber);
+        $orderId             = $this->outwardLabelDb->getOrderIdByTrackingNumber($trackingNumber);
+
+        switch ($redirection) {
+            case LabelQueries::REDIRECTION_WOO_ORDER_EDIT_PAGE:
+                $order = wc_get_order($orderId);
+                if (!empty($order)) {
+                    $urlRedirection = $order->get_edit_order_url();
+                    break;
+                }
+            // We didn't find the order, redirect to the default page
+            case LabelQueries::REDIRECTION_COLISSIMO_ORDERS_LISTING:
+            default:
+                $urlRedirection = admin_url('admin.php?page=wc_colissimo_view');
+                break;
+        }
+
+        Logger::debug(
+            'Delete outward label',
+            [
+                'tracking_number'       => $trackingNumber,
+                'related_inward_labels' => $inwardLabelsRelated,
+                'method'                => __METHOD__,
+            ]
+        );
+
+        $multiParcelsLabels = $this->outwardLabelDb->getMultiParcelsLabels($orderId);
+        if (!empty($multiParcelsLabels[$trackingNumber]) && 'FOLLOWER' === $multiParcelsLabels[$trackingNumber]) {
+            $masterLabel = array_search('MASTER', $multiParcelsLabels);
+
+            if (!empty($masterLabel)) {
+                $this->adminNotices->add_notice(
+                    'outward_label_delete',
+                    'notice-error',
+                    // translators: %s is the tracking number of the master label bound to this one.
+                    sprintf(__('You cannot delete this label because the label %s is bound to it.', 'colissimo-shipping-methods-for-woocommerce'), $masterLabel)
+                );
+
+                return wp_safe_redirect($urlRedirection);
+            }
+        }
+
+        $result = $this->outwardLabelDb->delete($trackingNumber);
+
+        if (1 != $result) {
+            Logger::error(
+                'Unable to delete label',
+                [
+                    'tracking_number' => $trackingNumber,
+                    'result'          => $result,
+                    'method'          => __METHOD__,
+                ]
+            );
+
+            $this->adminNotices->add_notice(
+                'outward_label_delete',
+                'notice-error',
+                sprintf(
+                    // translators: %s is the tracking number of the label.
+                    __('Unable to delete label %s', 'colissimo-shipping-methods-for-woocommerce'),
+                    $trackingNumber
+                )
+            );
+        } else {
+            $order = wc_get_order($orderId);
+
+            if (!empty($order)) {
+                // If it's the last following parcel, remove also the multi-parcels number
+                if (1 === count($multiParcelsLabels) && !empty($multiParcelsLabels[$trackingNumber])) {
+                    $order->update_meta_data('lpc_multi_parcels_amount', '');
+                    $order->save();
+                }
+
+                // Remove the related order meta
+                $order->update_meta_data(LabelGenerationOutward::OUTWARD_PARCEL_NUMBER_META_KEY, '');
+                $order->save();
+            }
+
+            // translators: %s is the tracking number of the deleted label.
+            $noticeText = sprintf(__('Label %s deleted', 'colissimo-shipping-methods-for-woocommerce'), $trackingNumber);
+            if (count($inwardLabelsRelated) > 0) {
+                $inwardDeletionResult = $this->inwardLabelDb->deleteForOutward($trackingNumber);
+
+                if (count($inwardLabelsRelated) != $inwardDeletionResult) {
+                    Logger::error(
+                        'Unable to delete some inwards label related to ouwtard',
+                        [
+                            'tracking_number'       => $trackingNumber,
+                            'related_inward_labels' => $inwardLabelsRelated,
+                            'result'                => $inwardDeletionResult,
+                            'method'                => __METHOD__,
+                        ]
+                    );
+                } else {
+                    foreach ($inwardLabelsRelated as $oneInwardLabel) {
+                        $noticeText .= '<br>' . sprintf(
+                            // translators: %s is the tracking number of the deleted inward label.
+                                __('Inward label %s deleted', 'colissimo-shipping-methods-for-woocommerce'),
+                                $oneInwardLabel->tracking_number
+                            );
+                    }
+                    // Remove the related order meta
+                    if (!empty($order)) {
+                        $order->update_meta_data(LabelGenerationInward::INWARD_PARCEL_NUMBER_META_KEY, '');
+                        $order->save();
+                    }
+                }
+            }
+
+            $this->adminNotices->add_notice(
+                'outward_label_delete',
+                'notice-success',
+                $noticeText
+            );
+        }
+
+        wp_safe_redirect($urlRedirection);
+    }
+}

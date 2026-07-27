@@ -1,0 +1,500 @@
+<?php
+
+namespace Colissimo\Core;
+
+use Colissimo\Classes\Email\OutwardLabelEmailManager;
+use Colissimo\Classes\Label\InwardLabelDb;
+use Colissimo\Classes\Label\LabelGenerationPayload;
+use Colissimo\Classes\Label\OutwardLabelDb;
+use Colissimo\Classes\Settings\AdminNotices;
+use Colissimo\Classes\Shipping\CapabilitiesPerCountry;
+use Colissimo\Classes\Shipping\ShippingMethod;
+use Colissimo\Classes\Shipping\ShippingMethods;
+use Colissimo\Classes\Shipping\ShippingZones;
+use Colissimo\Classes\Slip\SlipDb;
+use Colissimo\Helpers\Helper;
+use Colissimo\Helpers\Logger;
+use WC_Shipping_Zones;
+
+defined('ABSPATH') || die('Restricted Access');
+
+class Update {
+    const LPC_DB_VERSION_OPTION_NAME = 'lpc_db_version';
+
+    // const for 1.3 updates
+    const LPC_ORDERS_TO_MIGRATE_OPTION_NAME = 'lpc_migration13_orders_to_migrate';
+    const LPC_MIGRATION13_HOOK_NAME = 'lpcMigrationHook13';
+    const LPC_MIGRATION13_DONE_OPTION_NAME = 'lpc_migration13_done';
+
+    /** @var CapabilitiesPerCountry */
+    protected $capabilitiesPerCountry;
+    /** @var DbDefinition */
+    protected $dbDefinition;
+    /** @var OutwardLabelDb */
+    protected $outwardLabelDb;
+    /** @var InwardLabelDb */
+    protected $inwardLabelDb;
+    /** @var AdminNotices */
+    protected $adminNotices;
+    /** @var ShippingZones */
+    protected $shippingZones;
+    /** @var ShippingMethods */
+    protected $shippingMethods;
+    /** @var SlipDb */
+    protected $bordereauDb;
+
+    public function __construct(
+        ?CapabilitiesPerCountry $capabilitiesPerCountry = null,
+        ?DbDefinition $dbDefinition = null,
+        ?OutwardLabelDb $outwardLabelDb = null,
+        ?InwardLabelDb $inwardLabelDb = null,
+        ?AdminNotices $adminNotices = null,
+        ?ShippingZones $shippingZones = null,
+        ?ShippingMethods $shippingMethods = null,
+        ?SlipDb $bordereauDb = null
+    ) {
+        $this->capabilitiesPerCountry = Register::get('capabilitiesPerCountry');
+        $this->dbDefinition           = new DbDefinition();
+        $this->outwardLabelDb         = Register::get('outwardLabelDb');
+        $this->inwardLabelDb          = Register::get('inwardLabelDb');
+        $this->adminNotices           = Register::get('lpcAdminNotices');
+        $this->shippingZones          = Register::get('shippingZones');
+        $this->shippingMethods        = Register::get('shippingMethods');
+        $this->bordereauDb            = Register::get('bordereauDb');
+    }
+
+    public function init() {
+        add_action(self::LPC_MIGRATION13_HOOK_NAME, [$this, 'doMigration13']);
+        add_action('wp_loaded', [$this, 'update']);
+        add_filter('cron_schedules', [$this, 'addCronIntervals'], 100);
+    }
+
+    public function addCronIntervals($schedules) {
+        $schedules['fifteen_seconds'] = [
+            'interval' => 15,
+            'display'  => __('Every Fifteen Seconds', 'colissimo-shipping-methods-for-woocommerce'),
+        ];
+        $schedules['fifteen_minutes'] = [
+            'interval' => 15 * 60,
+            'display'  => __('Every Fifteen Minutes', 'colissimo-shipping-methods-for-woocommerce'),
+        ];
+
+        return $schedules;
+    }
+
+    public function createCapabilities() {
+        global $wp_roles;
+
+        if (!class_exists('WP_Roles') || !isset($wp_roles)) {
+            return;
+        }
+
+        // Only add the capabilities once to avoid erasing the User Role Editor modifications
+        // If the admin already has them, it means we already applied the default capabilities
+        $adminRole = $wp_roles->get_role('administrator');
+        if ($adminRole->has_cap('lpc_manage_settings')) {
+            return;
+        }
+
+        // By default, add all the capabilities to the admin and the main WooCommerce role
+        $roles = ['administrator', 'shop_manager'];
+
+        // If new capabilities are added, add them here and in an update script, update cannot enter this function
+        $capabilities = [
+            'lpc_manage_settings',
+            'lpc_colissimo_listing',
+            'lpc_colissimo_bandeau',
+            'lpc_manage_documents',
+            'lpc_manage_labels',
+            'lpc_download_labels',
+            'lpc_print_labels',
+            'lpc_delete_labels',
+            'lpc_send_emails',
+            'lpc_manage_bordereau',
+            'lpc_download_bordereau',
+            'lpc_print_bordereau',
+            'lpc_delete_bordereau',
+        ];
+
+        foreach ($roles as $role) {
+            if (!isset($wp_roles->roles[$role])) {
+                continue;
+            }
+
+            $roleObject = $wp_roles->get_role($role);
+
+            foreach ($capabilities as $capability) {
+                $roleObject->add_cap($capability);
+            }
+        }
+    }
+
+    public function update() {
+        $lpcVersionInstalled = Helper::get_option(self::LPC_DB_VERSION_OPTION_NAME, LPC_VERSION);
+        if (LPC_VERSION === $lpcVersionInstalled) {
+            return;
+        }
+
+        if (is_multisite()) {
+            $currentBlog = get_current_blog_id();
+            $sites       = get_sites();
+
+            foreach ($sites as $site) {
+                if (is_object($site)) {
+                    $site = get_object_vars($site);
+                }
+                switch_to_blog($site['blog_id']);
+                $lpcVersionInstalled = get_option(self::LPC_DB_VERSION_OPTION_NAME, LPC_VERSION);
+                $this->runUpdate($lpcVersionInstalled);
+                update_option(self::LPC_DB_VERSION_OPTION_NAME, LPC_VERSION);
+            }
+
+            switch_to_blog($currentBlog);
+        } else {
+            $this->runUpdate($lpcVersionInstalled);
+            update_option(self::LPC_DB_VERSION_OPTION_NAME, LPC_VERSION);
+        }
+    }
+
+    protected function runUpdate($versionInstalled) {
+        if (Helper::get_option(self::LPC_MIGRATION13_DONE_OPTION_NAME, false) !== false) {
+            $this->adminNotices->add_notice(
+                'label_migration',
+                'notice-success',
+                __('Colissimo Official plugin: the labels migration is done!', 'colissimo-shipping-methods-for-woocommerce')
+            );
+
+            delete_option(self::LPC_MIGRATION13_DONE_OPTION_NAME);
+        }
+
+        // Update from version under 1.3
+        if (version_compare($versionInstalled, '1.3') === - 1) {
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+            $this->dbDefinition->defineTableLabel();
+            $this->handleMigration13();
+        }
+
+        // Update from version under 1.5
+        if (version_compare($versionInstalled, '1.5') === - 1) {
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+            $this->shippingZones->addCustomZonesOrUpdateOne('Zone France');
+        }
+
+        // Update from version under 1.6
+        if (version_compare($versionInstalled, '1.6') === - 1) {
+            $currentlpc_email_outward_tracking = Helper::get_option(OutwardLabelEmailManager::EMAIL_OUTWARD_TRACKING_OPTION, 'no');
+
+            if ('yes' === $currentlpc_email_outward_tracking) {
+                $newlpc_email_outward_tracking = OutwardLabelEmailManager::ON_OUTWARD_LABEL_GENERATION_OPTION;
+            } else {
+                $newlpc_email_outward_tracking = 'no';
+            }
+
+            update_option(OutwardLabelEmailManager::EMAIL_OUTWARD_TRACKING_OPTION, $newlpc_email_outward_tracking, false);
+        }
+
+        // Update from version under 1.6.4
+        if (version_compare($versionInstalled, '1.6.4') === - 1) {
+            $this->outwardLabelDb->updateToVersion164();
+        }
+
+        // Update from version under 1.6.5
+        if (version_compare($versionInstalled, '1.6.5') === - 1) {
+            $this->outwardLabelDb->updateToVersion165();
+        }
+
+        // Update from version under 1.6.8
+        if (version_compare($versionInstalled, '1.6.8') === - 1) {
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+            $this->createCapabilities();
+            $this->shippingMethods->moveAlwaysFreeOption();
+        }
+
+        // Update from version under 1.7.1
+        if (version_compare($versionInstalled, '1.7.1') === - 1) {
+            foreach (WC_Shipping_Zones::get_zones() as $zone) {
+                if ('France' === $zone['zone_name']) {
+                    $newZone = WC_Shipping_Zones::get_zone($zone['id']);
+                    $newZone->set_zone_name('Zone France');
+                    $newZone->save();
+                }
+            }
+
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+        }
+
+        // Update from version under 1.7.2
+        if (version_compare($versionInstalled, '1.7.2') === - 1) {
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+            $this->outwardLabelDb->updateToVersion172();
+            $countries  = [
+                'SendingService_austria',
+                'SendingService_germany',
+                'SendingService_italy',
+                'SendingService_luxembourg',
+            ];
+            $expert     = Helper::get_option('lpc_expert_SendingService', 'dpd');
+            $domicileas = Helper::get_option('lpc_domicileas_SendingService', 'dpd');
+            foreach ($countries as $country) {
+                update_option('lpc_expert_' . $country, $expert, false);
+                update_option('lpc_domicileas_' . $country, $domicileas, false);
+            }
+
+            $companyName = Helper::get_option('lpc_company_name');
+            if (!empty($companyName)) {
+                update_option('lpc_origin_company_name', $companyName, false);
+            }
+        }
+
+        // Update from version under 1.7.4
+        if (version_compare($versionInstalled, '1.7.4') === - 1) {
+            update_option('lpc_parent_id_webservices', '');
+            $this->inwardLabelDb->updateToVersion174();
+
+            $mapType = Helper::get_option('lpc_pickup_map_type');
+            if (empty($mapType)) {
+                $isWebservice = Helper::get_option('lpc_prUseWebService', 'no');
+                update_option('lpc_pickup_map_type', !empty($isWebservice) && 'yes' === $isWebservice ? 'gmaps' : 'widget');
+            }
+        }
+
+        // Update from version under 1.8.2
+        if (version_compare($versionInstalled, '1.8.2') === - 1) {
+            $this->outwardLabelDb->updateToVersion182();
+            $this->inwardLabelDb->updateToVersion182();
+            $this->bordereauDb->updateToVersion182();
+        }
+
+        // Update from version under 1.9.2
+        if (version_compare($versionInstalled, '1.9.2') === - 1) {
+            $passwordAlreadyEncrypted = Helper::get_option('lpc_pwd_encrypted', 0);
+            if (empty($passwordAlreadyEncrypted)) {
+                update_option(
+                    'lpc_pwd_webservices',
+                    Helper::encryptPassword(
+                        Helper::get_option('lpc_pwd_webservices')
+                    )
+                );
+                update_option('lpc_pwd_encrypted', 1);
+            }
+            $this->outwardLabelDb->updateToVersion192();
+            $this->inwardLabelDb->updateToVersion192();
+        }
+
+        // Update from version under 1.9.4
+        if (version_compare($versionInstalled, '1.9.4') === - 1) {
+            $noShippingClassUpdated = Helper::get_option('lpc_no_shipping_class_updated', 0);
+            if (empty($noShippingClassUpdated)) {
+                update_option('lpc_no_shipping_class_updated', 1);
+                $this->addNoShippingClass();
+            }
+        }
+
+        // Update from version under 2.0.0
+        if (version_compare($versionInstalled, '2.0.0') === - 1) {
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+        }
+
+        // Update from version under 2.2.0
+        if (version_compare($versionInstalled, '2.2.0') === - 1) {
+            $returnByClient = Helper::get_option('lpc_customers_download_return_label', 'no');
+            if ('no' !== $returnByClient) {
+                update_option('lpc_customers_download_return_label', 'yes', false);
+            }
+        }
+
+        // Update from version under 2.5.0
+        if (version_compare($versionInstalled, '2.5.0', '<')) {
+            $relayTypes = Helper::get_option('lpc_relay_point_type', 'all');
+
+            if (!empty($relayTypes) && 'all' !== $relayTypes) {
+                sort($relayTypes);
+
+                if (['BDP', 'BPR'] === $relayTypes) {
+                    update_option('lpc_relay_types', '-1');
+                } elseif (['A2P', 'PCS'] === $relayTypes) {
+                    update_option('lpc_relay_types', '2');
+                } else {
+                    update_option('lpc_relay_types', '1');
+                }
+            }
+
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+        }
+
+        if (version_compare($versionInstalled, '2.7.0', '<')) {
+            $this->addHazardousProductsAttribute();
+        }
+
+        if (version_compare($versionInstalled, '2.8.2', '<')) {
+            $this->bordereauDb->updateToVersion282();
+        }
+
+        if (version_compare($versionInstalled, '2.8.3', '<')) {
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+
+            $logsFilePath = wp_upload_dir()['basedir'] . DIRECTORY_SEPARATOR . 'colissimo' . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR . 'general.log';
+            if (file_exists($logsFilePath)) {
+                $oldLogs = explode('<log>', file_get_contents($logsFilePath));
+
+                $newLogs = [];
+                foreach ($oldLogs as $oneLine) {
+                    if (empty($oneLine)) {
+                        continue;
+                    }
+
+                    $date      = substr($oneLine, 0, 19);
+                    $newLogs[] = [
+                        'time'    => strtotime($date),
+                        'content' => $oneLine,
+                    ];
+                }
+
+                update_option('lpc_logs', wp_json_encode($newLogs), false);
+                wp_delete_file($logsFilePath);
+            }
+        }
+
+        if (version_compare($versionInstalled, '2.10.0', '<')) {
+            $cuttOffDates = Helper::get_option('lpc_delivery_date_cuttoff_times');
+            if (!empty($cuttOffDates)) {
+                $cuttOffDates = @json_decode($cuttOffDates, true);
+                if (!empty($cuttOffDates['weekly_schedule'])) {
+                    foreach ($cuttOffDates['weekly_schedule'] as $index => $cuttOffHour) {
+                        $cuttOffDates['weekly_schedule'][$index] = [
+                            'cuttOff' => $cuttOffHour,
+                            'delay'   => '',
+                        ];
+                    }
+
+                    update_option('lpc_delivery_date_cuttoff_times', wp_json_encode($cuttOffDates), false);
+                }
+            }
+        }
+    }
+
+    /** Functions for update to 1.3 **/
+    protected function handleMigration13() {
+        $this->adminNotices->add_notice(
+            'label_migration',
+            'notice-success',
+            sprintf(
+                // translators: %s is the plugin version number.
+                __(
+                    'Thanks for updating Colissimo Official plugin to version %s. This version needs to modify the database structure and it will take a few minutes. While the migration is being done, you can use the plugin as usual but you won\'t be able to see the labels in the Colissimo listing. Please contact the Colissimo support if they are still not visible in a few hours.',
+                    'colissimo-shipping-methods-for-woocommerce'
+                ),
+                LPC_VERSION
+            )
+        );
+
+        // If we have to retry the migration, we don't erase orders ids to migrate
+        if (!Helper::get_option(self::LPC_ORDERS_TO_MIGRATE_OPTION_NAME, false)) {
+            $orderIdsToMigrate = $this->outwardLabelDb->getOldTableOrdersToMigrate();
+            update_option(self::LPC_ORDERS_TO_MIGRATE_OPTION_NAME, json_encode($orderIdsToMigrate), false);
+        }
+
+        if (!wp_next_scheduled(self::LPC_MIGRATION13_HOOK_NAME)) {
+            wp_schedule_event(time(), 'fifteen_seconds', self::LPC_MIGRATION13_HOOK_NAME);
+        }
+    }
+
+    public function doMigration13() {
+        $orderIdsToMigrate = json_decode(Helper::get_option(self::LPC_ORDERS_TO_MIGRATE_OPTION_NAME));
+
+        if (0 === count($orderIdsToMigrate)) {
+            $timestamp = wp_next_scheduled(self::LPC_MIGRATION13_HOOK_NAME);
+            wp_unschedule_event($timestamp, self::LPC_MIGRATION13_HOOK_NAME);
+            delete_option(self::LPC_ORDERS_TO_MIGRATE_OPTION_NAME);
+            update_option(self::LPC_MIGRATION13_DONE_OPTION_NAME, 1, false);
+
+            return;
+        }
+
+        $orderIdsToMigrateForCurrentBatch = array_splice($orderIdsToMigrate, 0, 5);
+
+        if (
+            $this->outwardLabelDb->migrateDataFromLabelTableForOrderIds($orderIdsToMigrateForCurrentBatch)
+            && $this->inwardLabelDb->migrateDataFromLabelTableForOrderIds($orderIdsToMigrateForCurrentBatch)
+        ) {
+            update_option(self::LPC_ORDERS_TO_MIGRATE_OPTION_NAME, json_encode($orderIdsToMigrate), false);
+        }
+    }
+
+    private function addNoShippingClass() {
+        foreach (WC_Shipping_Zones::get_zones() as $oneZone) {
+            $zone = WC_Shipping_Zones::get_zone($oneZone['id']);
+
+            $existingShippingMethods = array_map(
+                fn($v) => $v->id,
+                $zone->get_shipping_methods()
+            );
+
+            foreach ($existingShippingMethods as $shippingMethodInstanceId => $shippingMethodNamekey) {
+                $methodOptionKey = 'woocommerce_' . $shippingMethodNamekey . '_' . $shippingMethodInstanceId . '_settings';
+                $methodSettings  = Helper::get_option($methodOptionKey, 'no');
+
+                if (empty($methodSettings['shipping_rates'])) {
+                    continue;
+                }
+
+                foreach ($methodSettings['shipping_rates'] as $key => $rate) {
+                    if (!in_array(ShippingMethod::LPC_ALL_SHIPPING_CLASS_CODE, $rate['shipping_class'])) {
+                        $methodSettings['shipping_rates'][$key]['shipping_class'][] = ShippingMethod::LPC_NO_SHIPPING_CLASS_CODE;
+                    }
+                }
+
+                update_option($methodOptionKey, $methodSettings);
+            }
+        }
+    }
+
+    private function addHazardousProductsAttribute(): void {
+        $attributeAlias = LabelGenerationPayload::HAZMAT_ATTRIBUTE;
+        $taxonomy       = 'pa_' . $attributeAlias;
+
+        if (taxonomy_exists($taxonomy)) {
+            return;
+        }
+
+        $result = wc_create_attribute(
+            [
+                'name'         => __('Colissimo hazmat category', 'colissimo-shipping-methods-for-woocommerce'),
+                'slug'         => $attributeAlias,
+                'type'         => 'select',
+                'order_by'     => 'menu_order',
+                'has_archives' => false,
+            ]
+        );
+
+        if (is_wp_error($result)) {
+            Logger::error('Could not create hazmat attribute: ' . $result->get_error_message());
+
+            return;
+        }
+
+        register_taxonomy(
+            $taxonomy,
+            [
+                'product',
+            ],
+            [
+                'show_ui'   => false,
+                'query_var' => $attributeAlias,
+                'rewrite'   => false,
+            ]
+        );
+
+        foreach (LabelGenerationPayload::HAZMAT_CATEGORIES as $slug => $category) {
+            wp_insert_term(
+            // Can't call __() in class constants.
+            // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralText
+                __($category['label'], 'colissimo-shipping-methods-for-woocommerce'),
+                $taxonomy,
+                [
+                    'slug' => $slug,
+                ]
+            );
+        }
+    }
+}

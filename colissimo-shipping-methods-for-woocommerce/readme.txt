@@ -1,59 +1,59 @@
-=== Colissimo Officiel : Méthodes de livraison pour WooCommerce ===
+=== Colissimo shipping methods for WooCommerce ===
 Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
-Requires at least: 5.0
+Requires at least: 6.2
 Tested up to: 7.0
-Stable tag: 2.10.0
-Requires PHP: 7.4.0
+Stable tag: 3.0.0
+Requires PHP: 7.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
-Ce plugin permet d'utiliser les méthodes de livraison Colissimo dans WooCommerce
+This plugin allows you to use Colissimo shipping methods in WooCommerce
 
 == Description ==
 
 > #### Requirements
-> [WooCommerce (Testé régulièrement sur sa dernière version)](https://wordpress.org/plugins/woocommerce/)
+> [WooCommerce (Tested regularly on its latest version)](https://wordpress.org/plugins/woocommerce/)
 
-Ce plugin permet :
-* L’intégration de l’affichage des points retrait sur le site marchand
-* La génération et l’impression des étiquettes depuis le B.O. WooCommerce Colissimo
-* Le suivi des expéditions aux destinataires
+This plugin allows:
+* The integration of the display of pickup points on the merchant's site
+* The generation and printing of labels from the WooCommerce Colissimo back office
+* The tracking of shipments to recipients
 
-= Caractéristiques : =
+= Characteristics : =
 
-Colissimo Officiel regroupe plusieurs fonctionnalités essentielles dans un seul plugin.
+Colissimo contains several essential features in a single plugin.
 
-Celui-ci permet :
- 
-* EN FRONT OFFICE :
-    - L’affichage en responsive design des points de retrait
-    - Le suivi de commande depuis le site marchand
-    - La simplification du process retour dont la possibilité d’effectuer le retour en boite aux lettres
-* EN BACK OFFICE :
-    - L’envoi de colis vers la France, l’Outre Mer et l’international
-	- L’édition d’étiquettes depuis le back office marchand
-	- La génération d’un bordereau de dépôt
-	- Le suivi des commandes 
+It allows:
 
-= Bénéfices pour le e-commerçant : =
+* Front-office:
+	- Responsive design display of pickup points
+	- Order tracking from the merchant's site
+	- Simplification of the return process, including the possibility of making the return in a mailbox
+* Back-office:
+	- Shipping parcels to France, Overseas and internationally
+	- Labels creation from the merchant's back office
+	- Generating a deposit slip
+	- Tracking orders
 
-Le plugin Colissimo-Officiel est une solution complète & gratuite qui vous permettra de gagner du temps au quotidien dans le traitement de vos commandes et le suivi de vos expéditions. Vous pourrez facilement développer vos ventes à l’export en proposant les services innovants de la gamme Colissimo.
-En cas de besoin, vous pourrez vous appuyer sur le support technique Colissimo .
+= Benefits for the e-merchant =
 
-= Bénéfices pour le e-acheteur : =
+The Colissimo plugin is a complete & free solution that will save you time on a daily basis in processing your orders and tracking your shipments. You can easily develop your sales abroad by offering the innovative services of the Colissimo range.
+If needed, you can rely on Colissimo technical support.
 
-Colissimo facilite également la vie du destinataire en lui proposant le plus large éventail de solutions de livraison (en France et à l’international).
-L’e-acheteur peut suivre sur son espace client le parcours de son colis et effectuer les retours depuis ce même espace s’il le souhaite.
+= Benefits for the recipient =
+
+Colissimo also makes the recipient's life easier by offering them the widest range of delivery solutions (in France and internationally).
+The recipient can follow the journey of their parcel on their customer area and make returns from this same area if they wish.
 
 
 == Screenshots ==
-1. Onglet commandes Colissimo
-2. Onglet commandes WooCommerce
-3. Paramétrage du plugin
-4. Point de retrait Colissimo avec widget
-5. Prévisualisation des frais de livraison
-6. Associer les transporteurs à des zones
+1. Colissimo orders listing
+2. WooCommerce orders listing
+3. Plugin settings
+4. Colissimo pickup with widget
+5. Shipping prices preview
+6. Activate shipping methods on zones
 
 
 == Changelog ==

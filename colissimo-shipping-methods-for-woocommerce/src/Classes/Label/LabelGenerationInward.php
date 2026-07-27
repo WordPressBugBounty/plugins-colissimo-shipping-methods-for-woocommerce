@@ -1,0 +1,229 @@
+<?php
+
+namespace Colissimo\Classes\Label;
+
+use Colissimo\Api\AccountApi;
+use Colissimo\Classes\Shipping\CapabilitiesPerCountry;
+use Colissimo\Classes\Shipping\ShippingMethods;
+use Colissimo\Core\Register;
+use Colissimo\Helpers\Logger;
+use Colissimo\Helpers\Helper;
+use Colissimo\Api\LabelGenerationApi;
+use Colissimo\Classes\Email\InwardLabelEmailManager;
+use Exception;
+use WC_Order;
+
+defined('ABSPATH') || die('Restricted Access');
+
+class LabelGenerationInward {
+    const INWARD_PARCEL_NUMBER_META_KEY = 'lpc_inward_parcel_number';
+    const ORDERS_INWARD_PARCEL_FAILED = 'lpc_orders_inward_parcel_failed';
+
+    /** @var CapabilitiesPerCountry */
+    protected $capabilitiesPerCountry;
+    /** @var LabelGenerationApi */
+    protected $labelGenerationApi;
+    /** @var InwardLabelDb */
+    protected $inwardLabelDb;
+    /** @var ShippingMethods */
+    protected $shippingMethods;
+    /** @var AccountApi */
+    protected $accountApi;
+
+    public function __construct(
+        ?CapabilitiesPerCountry $capabilitiesPerCountry = null,
+        ?LabelGenerationApi $labelGenerationApi = null,
+        ?InwardLabelDb $inwardLabelDb = null,
+        ?ShippingMethods $shippingMethods = null,
+        ?AccountApi $accountApi = null
+    ) {
+        $this->capabilitiesPerCountry = Register::get('capabilitiesPerCountry');
+        $this->labelGenerationApi     = Register::get('labelGenerationApi');
+        $this->inwardLabelDb          = Register::get('inwardLabelDb');
+        $this->shippingMethods        = Register::get('shippingMethods');
+        $this->accountApi             = Register::get('accountApi');
+    }
+
+    public function generate(WC_Order $order, array $customParams = []) {
+        if (is_admin() && empty($customParams['is_from_client'])) {
+            $lpc_admin_notices = Register::get('lpcAdminNotices');
+        }
+
+        $time         = time();
+        $orderId      = $order->get_order_number();
+        $ordersFailed = get_option(self::ORDERS_INWARD_PARCEL_FAILED, []);
+        if (!empty($ordersFailed)) {
+            update_option(
+                self::ORDERS_INWARD_PARCEL_FAILED,
+                array_filter($ordersFailed, fn($error) => $error['time'] < $time - 604800),
+                false
+            );
+        }
+
+        try {
+            $payload         = $this->buildPayload($order, $customParams);
+            $isSecuredReturn = false;
+            if (!empty($customParams['is_from_client'])) {
+                $accountInformation = $this->accountApi->getAccountInformation();
+                if (!empty($accountInformation['optionRetourToken'])) {
+                    $isSecuredReturn = 1 === intval(Helper::get_option('lpc_secured_return', 0));
+                }
+            }
+            $response = $this->labelGenerationApi->generateLabel($payload, $isSecuredReturn);
+
+            if (!empty($customParams['outward_label_number']) && !empty($ordersFailed[$customParams['outward_label_number']])) {
+                unset($ordersFailed[$customParams['outward_label_number']]);
+                update_option(self::ORDERS_INWARD_PARCEL_FAILED, $ordersFailed, false);
+            }
+        } catch (Exception $e) {
+            $errorMessage = $e->getMessage();
+            if (!empty($lpc_admin_notices)) {
+                $lpc_admin_notices->add_notice(
+                    'inward_label_generate',
+                    'notice-error',
+                    // translators: %s is the order ID
+                    sprintf(__('Order %s: Inward label was not generated:', 'colissimo-shipping-methods-for-woocommerce'), $orderId) . ' ' . $errorMessage
+                );
+            }
+
+            if (!empty($customParams['outward_label_number']) && 'no_outward' !== $customParams['outward_label_number']) {
+                $ordersFailed[$customParams['outward_label_number']] = [
+                    'message' => $errorMessage,
+                    'time'    => $time,
+                ];
+                update_option(self::ORDERS_INWARD_PARCEL_FAILED, $ordersFailed, false);
+            }
+
+            return false;
+        }
+
+        $contentResponseName = $isSecuredReturn ? 'tokenV3Response' : 'labelV31Response';
+        $parcelNumber        = $response['<jsonInfos>'][$contentResponseName]['parcelNumber'];
+        $label               = $response['<label>'];
+
+        // currently, and contrary to the not-return/outward CN23, in the return/inward CN23
+        // the API always inlines the CN23 elements at the end of the label (and not in a dedicated field...)
+        // because it may change in order to be more symmetrical, this code does not assume that the CN23
+        // field is empty.
+        $cn23 = @$response['<cn23>'];
+
+        $labelFormat = $payload->getLabelFormat();
+
+        $order->update_meta_data(self::INWARD_PARCEL_NUMBER_META_KEY, $parcelNumber);
+        $order->save();
+
+        try {
+            $outwardLabelNumber = $customParams['outward_label_number'] ?? null;
+            $this->inwardLabelDb->insert($order->get_id(), $label, $parcelNumber, $cn23, $labelFormat, $outwardLabelNumber);
+        } catch (Exception $e) {
+            if (!empty($lpc_admin_notices)) {
+                $lpc_admin_notices->add_notice(
+                    'inward_label_generate',
+                    'notice-error',
+                    // translators: %s is the order ID
+                    sprintf(__('Order %s: Inward label was not generated:', 'colissimo-shipping-methods-for-woocommerce'), $orderId) . ' ' . $e->getMessage()
+                );
+            }
+
+            return false;
+        }
+
+        if (!empty($lpc_admin_notices)) {
+            $actions = '';
+
+            $labelQueries = new LabelQueries();
+            if (current_user_can('lpc_download_labels')) {
+                $actions .= '<span class="dashicons dashicons-download lpc_label_action_download" ' .
+                            $labelQueries->getLabelInwardDownloadAttr($parcelNumber, $labelFormat) . '></span>';
+            }
+
+            if (current_user_can('lpc_print_labels')) {
+                $printerIcon = $GLOBALS['wp_version'] >= '5.5' ? 'dashicons-printer' : 'dashicons-media-default';
+                $actions     .= '<span class="dashicons ' . $printerIcon . ' lpc_label_action_print" ' .
+                                $labelQueries->getLabelInwardPrintAttr($parcelNumber, $labelFormat) . ' ></span>';
+            }
+
+            $lpc_admin_notices->add_notice(
+                'inward_label_generate',
+                'notice-success',
+                // translators: %s is the order ID
+                sprintf(__('Order %s: Inward label generated', 'colissimo-shipping-methods-for-woocommerce'), $orderId) . $actions
+            );
+        }
+
+        $email_inward_label = Helper::get_option(InwardLabelEmailManager::EMAIL_RETURN_LABEL_OPTION, 'no');
+        if ('yes' === $email_inward_label) {
+            /**
+             * Action when the return shipping label has been sent by email
+             *
+             * @since 1.0.2
+             */
+            do_action(
+                // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- the plugin's own hook, correctly prefixed with "lpc_".
+                'lpc_inward_label_generated_to_email',
+                [
+                    'order' => $order,
+                    'label' => $label,
+                ]
+            );
+        }
+
+        return $parcelNumber;
+    }
+
+    protected function buildPayload(WC_Order $order, array $customParams = []) {
+        $customerAddress = [
+            'companyName' => $order->get_shipping_company(),
+            'firstName'   => $order->get_shipping_first_name(),
+            'lastName'    => $order->get_shipping_last_name(),
+            'street'      => $order->get_shipping_address_1(),
+            'street2'     => $order->get_shipping_address_2(),
+            'city'        => $order->get_shipping_city(),
+            'zipCode'     => $order->get_shipping_postcode(),
+            'countryCode' => $order->get_shipping_country(),
+            'email'       => $order->get_billing_email(),
+            'phone'       => $order->get_billing_phone(),
+        ];
+
+        // For Luxembourg, the zip code must not have the "L-" prefix
+        if ('LU' === strtoupper($customerAddress['countryCode'])) {
+            $customerAddress['zipCode'] = ltrim($customerAddress['zipCode'], 'lL-');
+        }
+
+        if (method_exists($order, 'get_shipping_phone')) {
+            $shippingPhone = $order->get_shipping_phone();
+            if (!empty($shippingPhone)) {
+                $customerAddress['phone'] = $shippingPhone;
+            }
+        }
+
+        $productCode = $this->capabilitiesPerCountry->getReturnProductCodeForDestination($order->get_shipping_country());
+
+        if (empty($productCode)) {
+            Logger::error('Not allowed for this destination', ['order' => $order]);
+            throw new \Exception(esc_html__('Not allowed for this destination', 'colissimo-shipping-methods-for-woocommerce'));
+        }
+
+        $payload            = new LabelGenerationPayload();
+        $returnAddress      = $payload->getReturnAddress();
+        $shippingMethodUsed = $this->shippingMethods->getColissimoShippingMethodOfOrder($order);
+        $payload
+            ->isReturnLabel()
+            ->withOrderNumber($order->get_order_number())
+            ->withProductCode($productCode)
+            ->withCredentials()
+            ->withCuserInfoText()
+            ->withSender($customerAddress, $customParams)
+            ->withAddressee($returnAddress, $shippingMethodUsed)
+            ->withPackage($order, $customParams)
+            ->withPreparationDelay()
+            ->withInstructions($order->get_customer_note())
+            ->withOutputFormat($customParams)
+            ->withCustomsDeclaration($order, $customParams)
+            ->withFtd($returnAddress['countryCode'])
+            ->withInsuranceValue($order->get_subtotal(), $order->get_shipping_country(), $shippingMethodUsed, $customParams)
+            ->withHazmat($order, $customParams);
+
+        return $payload->checkConsistency();
+    }
+}

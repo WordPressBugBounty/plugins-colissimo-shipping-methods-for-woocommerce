@@ -2,81 +2,72 @@
 /**
  * Plugin Name: Colissimo shipping methods for WooCommerce
  * Description: This extension gives you the possibility to use the Colissimo shipping methods in WooCommerce
- * Version: 2.10.0
+ * Version: 3.0.0
  * Author: Colissimo
  * Author URI: https://www.colissimo.entreprise.laposte.fr/fr
- * Text Domain: wc_colissimo
  *
+ * Requires PHP: 7.4
  * Requires Plugins: woocommerce
- * WC requires at least: 6.0.0
- * WC tested up to: 9.3.3
+ * WC requires at least: 7.0.0
+ * WC tested up to: 10.9.0
  *
- * @package wc_colissimo
+ * @package colissimo-shipping-methods-for-woocommerce
  *
  * License: GNU General Public License v3.0
  */
+
+use Automattic\WooCommerce\Utilities\FeaturesUtil;
+use Colissimo\Core\BlocksIntegration;
+use Colissimo\Classes\Label\TrackingPage;
+use Colissimo\Classes\Shipping\ExpertDdp;
+use Colissimo\Classes\Shipping\SignDdp;
+use Colissimo\Core\DbDefinition;
+use Colissimo\Init\InitGlobal;
+use Colissimo\Init\InitAdmin;
+use Colissimo\Init\InitPublic;
+use Colissimo\Core\Register;
+use Colissimo\Core\Update;
+use Colissimo\Helpers\Helper;
+use Colissimo\Helpers\Compatibility;
+use Colissimo\Helpers\OrderQueries;
 
 defined('ABSPATH') || die('Restricted Access');
 
 // Make sure WooCommerce is active before declaring the shipping methods
 if (
-    file_exists(WPMU_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'woocommerce' . DIRECTORY_SEPARATOR . 'woocommerce.php')
-    || in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))
-    || (is_multisite() && in_array('woocommerce/woocommerce.php',
-                                   apply_filters('active_plugins', array_keys(get_site_option('active_sitewide_plugins')))))
+    file_exists(__DIR__ . '/vendor_prefixed/autoload.php')
+    && (
+        file_exists(WPMU_PLUGIN_DIR . DIRECTORY_SEPARATOR . 'woocommerce' . DIRECTORY_SEPARATOR . 'woocommerce.php')
+        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- intentional re-use of a documented WooCommerce/WordPress core hook.
+        || in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))
+        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- intentional re-use of a documented WooCommerce/WordPress core hook.
+        || (is_multisite() && in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', array_keys(get_site_option('active_sitewide_plugins')))))
+    )
 ) {
-    // Load defines
-    if (!defined('DS')) {
-        define('DS', DIRECTORY_SEPARATOR);
-    }
-
-    define('LPC_COMPONENT', basename(plugin_dir_path(__FILE__)));
-    define('LPC_FOLDER', plugin_dir_path(__FILE__));
-    define('LPC_RESOURCE_FOLDER', LPC_FOLDER . DS . 'resources' . DS);
-    define('LPC_INCLUDES', LPC_FOLDER . 'includes' . DS);
-    define('LPC_ADMIN', LPC_FOLDER . 'admin' . DS);
-    define('LPC_PUBLIC', LPC_FOLDER . 'public' . DS);
-    define('LPC_CONTACT_EMAIL', 'ecommerce@acyba.com');
-    define('LPC_CONTACT_PHONE', '0241742088');
-
-    require_once ABSPATH . 'wp-admin/includes/plugin.php';
-    $pluginData = get_file_data(__FILE__, ['version' => 'Version']);
-    define('LPC_VERSION', $pluginData['version']);
+    include_once __DIR__ . '/vendor_prefixed/autoload.php';
 
     class LpcInit {
-        protected $register;
-
-        /**
-         * LpcInit constructor.
-         */
         public function __construct() {
-            $this->loadLanguages();
+            $this->constants();
 
-            require_once LPC_INCLUDES . 'lpc_register.php';
-            $this->register = new LpcRegister();
+            $register = new Register();
 
-            require_once LPC_INCLUDES . 'init.php';
-            new LpcIncludeInit();
-
-            // Load the logger class
-            require_once LPC_INCLUDES . 'lpc_logger.php';
-            require_once LPC_INCLUDES . 'lpc_helper.php';
+            new InitGlobal();
 
             if (defined('WP_ADMIN') && WP_ADMIN) {
-                require_once LPC_ADMIN . 'init.php';
-                new LpcAdminInit();
+                new InitAdmin();
 
                 if (defined('DOING_AJAX') && DOING_AJAX) {
                     // needed for ajax calls from front
-                    require_once LPC_PUBLIC . 'init.php';
-                    new LpcPublicInit();
+                    new InitPublic();
                 }
             } else {
-                require_once LPC_PUBLIC . 'init.php';
-                new LpcPublicInit();
+                new InitPublic();
             }
 
-            $this->register->init();
+            $register->init();
+
+            $this->initActivation();
             $this->initCapabilities();
             $this->register_rewrite_rules();
             $this->checkCompatibility();
@@ -87,27 +78,36 @@ if (
             $this->initTranslations();
         }
 
+        private function initActivation() {
+            register_activation_hook(
+                LPC_MAIN_FILE,
+                function () {
+                    $dbDefinition = new DbDefinition();
+                    $dbDefinition->defineTableLabel();
+                }
+            );
+        }
+
         public function initTranslations() {
             add_action('plugins_loaded', function () {
                 if ('fr_FR' === get_locale()) {
-                    load_textdomain('wc_colissimo', LPC_FOLDER . 'languages/wc_colissimo-fr_FR.mo');
+                    load_textdomain('colissimo-shipping-methods-for-woocommerce', LPC_FOLDER . 'languages/colissimo-shipping-methods-for-woocommerce-fr_FR.mo');
                 }
             });
         }
 
         public function initBlockCheckout() {
             add_action('woocommerce_blocks_loaded', function () {
-                require_once __DIR__ . '/lpc_wc_block-blocks-integration.php';
                 add_action(
                     'woocommerce_blocks_cart_block_registration',
                     function ($integration_registry) {
-                        $integration_registry->register(new LpcWcBlock_Blocks_Integration());
+                        $integration_registry->register(new BlocksIntegration());
                     }
                 );
                 add_action(
                     'woocommerce_blocks_checkout_block_registration',
                     function ($integration_registry) {
-                        $integration_registry->register(new LpcWcBlock_Blocks_Integration());
+                        $integration_registry->register(new BlocksIntegration());
                     }
                 );
             });
@@ -120,8 +120,8 @@ if (
                 $categories,
                 [
                     [
+                        'title' => 'LpcWcBlock Blocks',
                         'slug'  => 'lpc_wc_block',
-                        'title' => __('LpcWcBlock Blocks', 'lpc_wc_block'),
                     ],
                 ]
             );
@@ -142,14 +142,14 @@ if (
 
             $order->update_meta_data('lpc_using_ddp', 0);
 
-            if (!LpcOrderQueries::hasShippingMethod($order, LpcExpertDDP::ID) && !LpcOrderQueries::hasShippingMethod($order, LpcSignDDP::ID)) {
+            if (!OrderQueries::hasShippingMethod($order, ExpertDdp::ID) && !OrderQueries::hasShippingMethod($order, SignDdp::ID)) {
                 $order->save();
 
                 return;
             }
 
             $countryCode = strtoupper($order->get_shipping_country());
-            $extraCost   = LpcHelper::get_option('lpc_extracost_' . strtolower($countryCode), 0);
+            $extraCost   = Helper::get_option('lpc_extracost_' . strtolower($countryCode), 0);
 
             $order->update_meta_data('lpc_ddp_cost', $extraCost);
             $order->update_meta_data('lpc_using_ddp', 1);
@@ -158,29 +158,27 @@ if (
 
         public function initCapabilities() {
             register_activation_hook(
-                LPC_FOLDER . 'index.php',
+                LPC_MAIN_FILE,
                 function () {
-                    $lpcUpdate = new LpcUpdate();
+                    $lpcUpdate = new Update();
                     $lpcUpdate->createCapabilities();
                 }
             );
         }
 
         protected function register_rewrite_rules() {
-            require_once LPC_PUBLIC . 'tracking' . DS . 'lpc_tracking_page.php';
-
             add_action(
                 'init',
                 function () {
-                    LpcTrackingPage::addRewriteRule();
+                    TrackingPage::addRewriteRule();
                 }
             );
 
-            register_deactivation_hook(LPC_FOLDER . 'index.php', 'flush_rewrite_rules');
+            register_deactivation_hook(LPC_MAIN_FILE, 'flush_rewrite_rules');
             register_activation_hook(
-                LPC_FOLDER . 'index.php',
+                LPC_MAIN_FILE,
                 function () {
-                    LpcTrackingPage::addRewriteRule();
+                    TrackingPage::addRewriteRule();
 
                     flush_rewrite_rules();
                 }
@@ -188,19 +186,9 @@ if (
         }
 
         protected function checkCompatibility() {
-            require_once LPC_ADMIN . 'lpc_compatibility.php';
-            LpcCompatibility::checkCDI();
-            LpcCompatibility::checkJQueryMigrate();
-            LpcCompatibility::checkJQueryMigrateWP56();
-        }
-
-        protected function loadLanguages() {
-            add_action(
-                'init',
-                function () {
-                    load_plugin_textdomain('wc_colissimo', false, basename(__DIR__) . '/languages/');
-                }
-            );
+            Compatibility::checkCDI();
+            Compatibility::checkJQueryMigrate();
+            Compatibility::checkJQueryMigrateWP56();
         }
 
         // Be sure that CRON task are running
@@ -212,10 +200,31 @@ if (
 
         private function hposCompatibility() {
             add_action('before_woocommerce_init', function () {
-                if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
-                    \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+                if (class_exists(FeaturesUtil::class)) {
+                    FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
                 }
             });
+        }
+
+        private function constants() {
+            if (!defined('DS')) {
+                define('DS', DIRECTORY_SEPARATOR);
+            }
+
+            define('LPC_COMPONENT', basename(plugin_dir_path(__FILE__)));
+            define('LPC_FOLDER', rtrim(plugin_dir_path(__FILE__), '\\/' . DS) . DS);
+            define('LPC_MAIN_FILE', LPC_FOLDER . 'index.php');
+            define('LPC_PARTIALS_FOLDER', LPC_FOLDER . 'src' . DS . 'Partials' . DS);
+            define('LPC_RESOURCE_FOLDER', LPC_FOLDER . 'assets' . DS . 'misc' . DS);
+            define('LPC_INCLUDES', LPC_FOLDER . 'includes' . DS);
+            define('LPC_ADMIN', LPC_FOLDER . 'admin' . DS);
+            define('LPC_PUBLIC', LPC_FOLDER . 'public' . DS);
+            define('LPC_CONTACT_EMAIL', 'ecommerce@acyba.com');
+            define('LPC_CONTACT_PHONE', '0241742088');
+
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            $pluginData = get_file_data(LPC_MAIN_FILE, ['version' => 'Version']);
+            define('LPC_VERSION', $pluginData['version']);
         }
     }
 

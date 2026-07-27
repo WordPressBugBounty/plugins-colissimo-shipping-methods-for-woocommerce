@@ -1,0 +1,439 @@
+<?php
+
+namespace Colissimo\Api;
+
+use Colissimo\Classes\Label\LabelStatus;
+use Colissimo\Core\Ajax;
+use Colissimo\Helpers\Logger;
+use Colissimo\Helpers\Helper;
+use Colissimo\Helpers\OrderQueries;
+use Exception;
+use Colissimo\Classes\Label\LabelGenerationOutward;
+use Colissimo\Classes\Order\OrderStatuses;
+use Colissimo\Core\Register;
+use Colissimo\Classes\Shipping\ShippingMethods;
+use Colissimo\Classes\Label\OutwardLabelDb;
+use WC_Geolocation;
+
+defined('ABSPATH') || die('Restricted Access');
+
+class TrackingApi extends RestApi {
+    const API_BASE_URL = 'https://ws.colissimo.fr/tracking-timeline-ws/rest/tracking/';
+
+    const CIPHER = 'aes-128-cbc';
+    const CRYPT_KEY = 'lpc_crypt_key';
+    const QUERY_VAR = 'lpc_tracking_hash';
+
+    const LAST_EVENT_CODE_META_KEY = '_lpc_last_event_code';
+    const LAST_EVENT_DATE_META_KEY = '_lpc_last_event_date';
+    const IS_DELIVERED_META_KEY = '_lpc_is_delivered';
+    const LAST_EVENT_INTERNAL_CODE_META_KEY = '_lpc_last_event_internal_code';
+
+    const IS_DELIVERED_META_VALUE_TRUE = '1';
+    const IS_DELIVERED_META_VALUE_FALSE = '0';
+
+    const ORDER_IDS_TO_UPDATE_NAME_OPTION_NAME = 'lpc_order_ids_to_update_tracking';
+    const UPDATE_TRACKING_ORDER_CRON_NAME = 'lpc_update_tracking';
+    const MAX_ORDERS_TO_UPDATE_PER_BATCH = 40;
+
+    const TRACKING_LANGUAGES = [
+        'fr_' => 'fr_FR',
+        'de_' => 'de_DE',
+        'en_' => 'en_GB',
+        'es_' => 'es_ES',
+        'it_' => 'it_IT',
+        'nl_' => 'nl_NL',
+    ];
+
+    protected $ivSize;
+    protected $shippingMethods;
+    protected $ajaxDispatcher;
+    /** @var OutwardLabelDb */
+    protected $outwardLabelDb;
+
+    /** @var LabelStatus */
+    protected $colissimoStatus;
+
+    public function __construct(
+        ?ShippingMethods $shippingMethods = null,
+        ?LabelStatus $colissimoStatus = null,
+        ?Ajax $ajaxDispatcher = null,
+        ?OutwardLabelDb $outwardLabelDb = null
+    ) {
+        if (function_exists('openssl_cipher_iv_length')) {
+            $this->ivSize = openssl_cipher_iv_length(self::CIPHER);
+        }
+
+        $this->shippingMethods = Register::get('shippingMethods');
+        $this->colissimoStatus = Register::get('colissimoStatus');
+        $this->ajaxDispatcher  = Register::get('ajaxDispatcher');
+        $this->outwardLabelDb  = Register::get('outwardLabelDb');
+    }
+
+    public function init() {
+        add_action(self::UPDATE_TRACKING_ORDER_CRON_NAME, [$this, 'updateAllStatusesTask']);
+    }
+
+    protected function getApiUrl(string $action): string {
+        return self::API_BASE_URL . $action;
+    }
+
+    /**
+     * @throws Exception When the response status code couldn't be retrieved.
+     */
+    public function getTrackingInfo($orderId, $trackingNumber, $ip) {
+        $language = 'fr_FR';
+
+        $order = wc_get_order($orderId);
+        if (!empty($order)) {
+            $userId = $order->get_user_id();
+            if (!empty($userId)) {
+                $locale = get_user_locale($userId);
+                if (in_array($locale, self::TRACKING_LANGUAGES)) {
+                    $language = $locale;
+                } else {
+                    $localeStart = substr($locale, 0, 3);
+                    $language    = self::TRACKING_LANGUAGES[$localeStart] ?? 'en_GB';
+                }
+            }
+        }
+
+        $request = [
+            'parcelNumber' => $trackingNumber,
+            'ip'           => $ip,
+            'lang'         => $language,
+        ];
+
+        if ('api_key' === Helper::get_option('lpc_credentials_type', 'api_key')) {
+            $request['apiKey'] = Helper::get_option('lpc_apikey');
+        } else {
+            $request['login']    = Helper::get_option('lpc_id_webservices');
+            $request['password'] = Helper::getPasswordWebService();
+        }
+
+        $response = $this->getTimeline($request);
+
+        if (!is_array($response['parcel']['event'])) {
+            $response['parcel']['event'] = [$response['parcel']['event']];
+        }
+
+        // Sort events first to last in case it isn't done on the API side
+        usort($response['parcel']['event'],
+            fn($a, $b) => strtotime($a['date']) > strtotime($b['date']) ? 1 : - 1
+        );
+
+        return $response;
+    }
+
+    private function getTimeline(array $payload) {
+        try {
+            $payloadWithoutCredentials = $payload;
+            unset($payloadWithoutCredentials['password']);
+            unset($payloadWithoutCredentials['apiKey']);
+
+            Logger::debug(
+                'Label tracking request',
+                [
+                    'method'  => __METHOD__,
+                    'payload' => $payloadWithoutCredentials,
+                ]
+            );
+
+            $response = $this->query('timelineCompany', $payload);
+
+            Logger::debug(
+                'Label tracking response',
+                [
+                    'method'   => __METHOD__,
+                    'response' => $response,
+                ]
+            );
+
+            if (!isset($response['status'][0]['code'])) {
+                throw new Exception('Error getting tracking last status.');
+            }
+
+            if (0 != $response['status'][0]['code']) {
+                Logger::error(
+                    __METHOD__ . ' error in API response',
+                    ['response' => $response]
+                );
+                throw new Exception(
+                    $response['status'][0]['message'], $response['status'][0]['code']
+                );
+            }
+
+            return $response;
+        } catch (Exception $e) {
+            Logger::error(
+                'Error getting tracking information.',
+                [
+                    'exception' => $e->getMessage(),
+                ]
+            );
+
+            throw $e;
+        }
+    }
+
+    public function updateAllStatuses($login = null, $password = null, $ip = null, $lang = null) {
+        $matchingOrdersId = OrderQueries::getLpcOrderIdsToRefreshDeliveryStatus();
+
+        Logger::debug(
+            __METHOD__ . ' all orders found in the X past days',
+            [
+                'orderIds' => $matchingOrdersId,
+            ]
+        );
+
+        $orderIdsToUpdateEncoded = get_option(self::ORDER_IDS_TO_UPDATE_NAME_OPTION_NAME);
+
+        if (!empty($orderIdsToUpdateEncoded)) {
+            $orderIdsToUpdate = json_decode($orderIdsToUpdateEncoded, true);
+
+            if (!is_array($orderIdsToUpdate)) {
+                $orderIdsToUpdate = [$orderIdsToUpdate];
+            }
+
+            $matchingOrdersId = array_merge($matchingOrdersId, $orderIdsToUpdate);
+            $matchingOrdersId = array_unique($matchingOrdersId);
+        }
+
+        $encodedMatchingOrdersId = is_array($matchingOrdersId) ? json_encode($matchingOrdersId) : '[]';
+
+        update_option(self::ORDER_IDS_TO_UPDATE_NAME_OPTION_NAME, $encodedMatchingOrdersId, false);
+
+        if (!wp_next_scheduled(self::UPDATE_TRACKING_ORDER_CRON_NAME)) {
+            $schedulingResult = wp_schedule_event(time(), 'fifteen_minutes', self::UPDATE_TRACKING_ORDER_CRON_NAME, [], true);
+
+            if (!wp_next_scheduled(self::UPDATE_TRACKING_ORDER_CRON_NAME)) {
+                Logger::debug('could not schedule event update statuses', [$schedulingResult]);
+            }
+        }
+    }
+
+    public function updateAllStatusesTask() {
+        $allOrderIdsToUpdateTrackingEncoded = get_option(self::ORDER_IDS_TO_UPDATE_NAME_OPTION_NAME);
+
+        if (empty($allOrderIdsToUpdateTrackingEncoded)) {
+            $timestamp = wp_next_scheduled(self::UPDATE_TRACKING_ORDER_CRON_NAME);
+            wp_unschedule_event($timestamp, self::UPDATE_TRACKING_ORDER_CRON_NAME);
+
+            return;
+        }
+
+        $allOrderIdsToUpdateTracking = json_decode($allOrderIdsToUpdateTrackingEncoded, true);
+
+        if (!is_array($allOrderIdsToUpdateTracking)) {
+            $allOrderIdsToUpdateTracking = [$allOrderIdsToUpdateTracking];
+        }
+
+        if (0 === count($allOrderIdsToUpdateTracking)) {
+            $timestamp = wp_next_scheduled(self::UPDATE_TRACKING_ORDER_CRON_NAME);
+            wp_unschedule_event($timestamp, self::UPDATE_TRACKING_ORDER_CRON_NAME);
+
+            return;
+        }
+
+        // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- Increase maximum execution time to avoid interruption on background status fetching
+        set_time_limit(300);
+
+        Logger::debug(
+            __METHOD__ . ' all orders remaining to update statuses',
+            [
+                'orderIds' => $allOrderIdsToUpdateTracking,
+            ]
+        );
+
+        $orderIdsToUpdateTracking = array_splice($allOrderIdsToUpdateTracking, 0, self::MAX_ORDERS_TO_UPDATE_PER_BATCH);
+        $orderStatusOnDelivered   = Helper::get_option('lpc_status_on_delivered', OrderStatuses::WC_LPC_DELIVERED);
+
+        Logger::debug(
+            __METHOD__ . ' updating statuses for orders',
+            [
+                'orderIds' => $orderIdsToUpdateTracking,
+            ]
+        );
+
+        foreach ($orderIdsToUpdateTracking as $orderId) {
+            if (empty($orderId)) {
+                continue;
+            }
+
+            $order = wc_get_order($orderId);
+
+            if (empty($order)) {
+                continue;
+            }
+
+            $trackingNumbers = $this->outwardLabelDb->getOrderLabels($orderId);
+            if (empty($trackingNumbers)) {
+                continue;
+            }
+
+            $mainTrackingNumber = $order->get_meta(LabelGenerationOutward::OUTWARD_PARCEL_NUMBER_META_KEY);
+            if (empty($mainTrackingNumber)) {
+                $mainTrackingNumber = $trackingNumbers[count($trackingNumbers) - 1];
+            }
+
+            $ip = WC_Geolocation::get_ip_address();
+
+            foreach ($trackingNumbers as $trackingNumber) {
+                Logger::debug(
+                    __METHOD__ . ' updating status for',
+                    [
+                        'orderId'        => $orderId,
+                        'trackingNumber' => $trackingNumber,
+                    ]
+                );
+
+                try {
+                    $currentState = $this->getTrackingInfo($orderId, $trackingNumber, $ip);
+                } catch (Exception $e) {
+                    Logger::error(
+                        __METHOD__ . ' can\'t update status',
+                        [
+                            'orderId'        => $orderId,
+                            'trackingNumber' => $trackingNumber,
+                            'errorMessage'   => $e->getMessage(),
+                        ]
+                    );
+
+                    continue;
+                }
+
+                // Get the last event of the label and store it
+                $lastEvent = end($currentState['parcel']['event']);
+
+                $eventLastCode = $lastEvent['code'];
+                $eventLastDate = $lastEvent['date'];
+
+                $currentStateInternalCode = $this->colissimoStatus->getInternalCodeForClp($eventLastCode);
+
+                if (null === $currentStateInternalCode) {
+                    $currentStateInternalCode = OrderStatuses::WC_LPC_UNKNOWN_STATUS_INTERNAL_CODE;
+                    $isDelivered              = false;
+                    $currentStateInfo         = null;
+                } else {
+                    $currentStateInfo = $this->colissimoStatus->getStatusInfo($currentStateInternalCode);
+                    $isDelivered      = OrderStatuses::WC_LPC_DELIVERED === $currentStateInfo['change_order_status'];
+                }
+                $this->outwardLabelDb->setLabelStatusId($trackingNumber, $currentStateInternalCode);
+
+                if (empty($mainTrackingNumber) || $mainTrackingNumber !== $trackingNumber) {
+                    continue;
+                }
+
+                // Store the label status on the order for the main label, and update the order accordingly
+                $order->update_meta_data(self::LAST_EVENT_CODE_META_KEY, $eventLastCode);
+                $order->update_meta_data(self::LAST_EVENT_DATE_META_KEY, strtotime($eventLastDate));
+                $order->update_meta_data(self::LAST_EVENT_INTERNAL_CODE_META_KEY, $currentStateInternalCode);
+
+                // The user manually changed the order status to "finished", don't change the order after this
+                if ($orderStatusOnDelivered === $order->get_status()) {
+                    $isDelivered = true;
+                }
+                $order->update_meta_data(self::IS_DELIVERED_META_KEY, $isDelivered ? self::IS_DELIVERED_META_VALUE_TRUE : self::IS_DELIVERED_META_VALUE_FALSE);
+
+                if ($isDelivered) {
+                    $newOrderStatus = $orderStatusOnDelivered;
+                } else {
+                    if (empty($currentStateInfo) || Helper::get_option('lpc_order_status_follows_shipping_status', 'yes') === 'no') {
+                        $newOrderStatus = 'unchanged_order_status';
+                    } else {
+                        $newOrderStatus = $currentStateInfo['change_order_status'];
+                    }
+                }
+
+                // phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- the plugin's own hook, correctly prefixed with "lpc_".
+                /**
+                 * Filter on the new status of an order, based on an option in the configuration
+                 *
+                 * @since 1.6.7
+                 */
+                $newOrderStatus = apply_filters('lpc_unified_tracking_api_change_order_status', $newOrderStatus, $order);
+                // phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+
+                if (!empty($newOrderStatus) && 'unchanged_order_status' !== $newOrderStatus) {
+                    $order->set_status($newOrderStatus);
+                }
+
+                $order->save();
+            }
+        }
+
+        update_option(self::ORDER_IDS_TO_UPDATE_NAME_OPTION_NAME, json_encode($allOrderIdsToUpdateTracking), false);
+    }
+
+    public function encrypt($trackNumber) {
+        if (function_exists('openssl_encrypt')) {
+            $iv         = openssl_random_pseudo_bytes($this->ivSize);
+            $cyphertext = openssl_encrypt($trackNumber, self::CIPHER, self::CRYPT_KEY, 0, $iv);
+
+            return urlencode(base64_encode(bin2hex($iv) . $cyphertext));
+        } else {
+            return $this->xorText(self::CRYPT_KEY, $trackNumber);
+        }
+    }
+
+    public function decrypt($trackHash) {
+        if (function_exists('openssl_decrypt')) {
+            $cypher = base64_decode(urldecode($trackHash));
+
+            $ivEncryptedSize = strlen(bin2hex(openssl_random_pseudo_bytes($this->ivSize)));
+
+            $encryptedIv = substr($cypher, 0, $ivEncryptedSize);
+
+            // This test is only to support the old way to encrypt/decrypt. In the future, we could use only the first way.
+            if (ctype_xdigit($encryptedIv)) {
+                $iv     = hex2bin($encryptedIv);
+                $ivSize = $ivEncryptedSize;
+            } else {
+                $iv     = substr($cypher, 0, $this->ivSize);
+                $ivSize = $this->ivSize;
+            }
+
+            $cyphertext = substr($cypher, $ivSize);
+
+            return openssl_decrypt($cyphertext, self::CIPHER, self::CRYPT_KEY, 0, $iv);
+        } else {
+            return $this->xorText(self::CRYPT_KEY, $trackHash);
+        }
+    }
+
+    public function xorText($key, $text) {
+        $keyLength  = strlen($key);
+        $textLength = strlen($text);
+
+        for ($i = 0; $i < $textLength; $i ++) {
+            $asciiValue = ord($text[$i]);
+            $xored      = $asciiValue ^ ord($key[$i % $keyLength]);
+            $text[$i]   = chr($xored);
+        }
+
+        return $text;
+    }
+
+    /**
+     * Returns the website tracking page for the first tracking ID available, or for the provided tracking number
+     *
+     * @param int         $orderId
+     * @param null|string $trackingNumber
+     *
+     * @return string
+     */
+    public function getTrackingPageUrlForOrder($orderId, $trackingNumber = null) {
+        if (empty($trackingNumber)) {
+            $order          = wc_get_order($orderId);
+            $trackingNumber = empty($order) ? '' : $order->get_meta('lpc_outward_parcel_number');
+        }
+
+        $trackingHash = $this->encrypt($orderId . '-' . $trackingNumber);
+
+        if (empty(get_option('permalink_structure'))) {
+            return '/index.php?' . self::QUERY_VAR . '=' . $trackingHash;
+        } else {
+            return '/lpc/tracking/' . $trackingHash;
+        }
+    }
+}
