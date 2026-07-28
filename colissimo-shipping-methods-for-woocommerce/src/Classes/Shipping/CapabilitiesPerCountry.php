@@ -5,6 +5,7 @@ namespace Colissimo\Classes\Shipping;
 use Colissimo\Core\Register;
 use Colissimo\Helpers\Helper;
 use Colissimo\Classes\Label\LabelGenerationPayload;
+use WC_Admin_Settings;
 use WC_Order;
 
 defined('ABSPATH') || die('Restricted Access');

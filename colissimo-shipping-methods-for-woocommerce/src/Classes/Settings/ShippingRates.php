@@ -7,6 +7,7 @@ use Colissimo\Helpers\Logger;
 use Colissimo\Helpers\Helper;
 use Colissimo\Core\Register;
 use Colissimo\Classes\Shipping\ShippingZones;
+use Exception;
 use WC_Shipping_Zones;
 
 defined('ABSPATH') || die('Restricted Access');

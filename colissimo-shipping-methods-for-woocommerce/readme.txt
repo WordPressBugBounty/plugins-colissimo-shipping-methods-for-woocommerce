@@ -3,7 +3,7 @@ Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 6.2
 Tested up to: 7.0
-Stable tag: 3.0.0
+Stable tag: 3.0.1
 Requires PHP: 7.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,33 @@ The recipient can follow the journey of their parcel on their customer area and 
 
 
 == Changelog ==
+
+= 3.0.1 =
+
+CORRECTIFS
+
+* Une erreur PHP introduite dans la précédente version a été corrigée lors de la mise à jour du panier.
+
+
+= 3.0.0 =
+
+FONCTIONNALITÉS
+
+* Une refonte intégrale de la structure de l'extension a été opérée afin de mieux gérer les futures évolutions, améliorer la sécurité et améliorer la performance sur la plupart des pages.
+
+AMÉLIORATIONS
+
+* Un audit de sécurité complet a été effectué sur l'ensemble du code de l'extension, et plusieurs améliorations ont été apportées pour renforcer la sécurité.
+* Il n'est plus obligatoire de renseigner le poids des produits pour que les points de retrait s'affichent (mais nous vous conseillons vivement de le faire).
+* La méthode d'envoi en point de retrait n'est plus proposée lorsque les identifiants saisis sont incorrects au lieu d'une popup blanche.
+* Le système de traduction est à présent entièrement géré par WordPress.
+
+CORRECTIFS
+
+* Certains messages de dépréciation ont été traités.
+* Un envoi partiel est à présent correctement identifié.
+* L'adresse d'un client connecté n'était pas toujours prise en compte pour l'envoi en point de retrait si aucun champ de l'adresse n'était modifié.
+
 
 = 2.10.0 =
 
