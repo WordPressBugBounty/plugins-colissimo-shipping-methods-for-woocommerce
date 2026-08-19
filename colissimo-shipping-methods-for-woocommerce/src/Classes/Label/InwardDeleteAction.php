@@ -64,8 +64,11 @@ class InwardDeleteAction {
         switch ($redirection) {
             case LabelQueries::REDIRECTION_WOO_ORDER_EDIT_PAGE:
                 $order = wc_get_order($orderId);
-                $urlRedirection = $order->get_edit_order_url();
-                break;
+                if (!empty($order)) {
+                    $urlRedirection = $order->get_edit_order_url();
+                    break;
+                }
+            // We didn't find the order, redirect to the default page
             case LabelQueries::REDIRECTION_COLISSIMO_ORDERS_LISTING:
             default:
                 $urlRedirection = admin_url('admin.php?page=wc_colissimo_view');

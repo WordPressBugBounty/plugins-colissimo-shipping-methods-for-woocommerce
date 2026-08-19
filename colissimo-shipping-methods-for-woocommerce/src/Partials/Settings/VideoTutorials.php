@@ -46,10 +46,6 @@ $videos = [
         'link'  => 'lfHFKScib3E',
         'title' => __('Deposit of bordereau', 'colissimo-shipping-methods-for-woocommerce'),
     ],
-    [
-        'link'  => '8ftc0L2s4qg',
-        'title' => __('Thermal printing kit', 'colissimo-shipping-methods-for-woocommerce'),
-    ],
 ]
 ?>
 <tr>

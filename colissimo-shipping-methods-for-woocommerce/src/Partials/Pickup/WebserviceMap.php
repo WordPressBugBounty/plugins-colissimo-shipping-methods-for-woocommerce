@@ -42,7 +42,7 @@ defined('ABSPATH') || die('Restricted Access');
 						value="<?php echo esc_attr($args['ceTown']); ?>"
 						placeholder="<?php esc_attr_e('City', 'colissimo-shipping-methods-for-woocommerce'); ?>">
 				<input type="hidden" id="lpc_modal_relays_country_id" value="<?php echo esc_attr($args['ceCountryId']); ?>">
-				<button id="lpc_layer_button_search" type="button">
+				<button id="lpc_layer_button_search" type="button" class="wp-element-button">
 					<span id="lpc_layer_button_search_desktop"><?php esc_html_e('Search', 'colissimo-shipping-methods-for-woocommerce'); ?></span>
 					<span class="dashicons dashicons-search" id="lpc_layer_button_search_mobile"></span>
 				</button>

@@ -67,22 +67,14 @@ class PickupSelection {
     }
 
     public function getCurrentPickUpLocationInfo() {
-        $wcSession  = Helper::getWooSession();
-        $pickUpInfo = $wcSession->get(self::PICKUP_LOCATION_SESSION_VAR_NAME);
-        if (empty($pickUpInfo)) {
-            $this->initSession();
-            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- plugin-controlled session state, not external input.
-            $pickUpInfo = $_SESSION[self::PICKUP_LOCATION_SESSION_VAR_NAME] ?? [];
-        }
+        $wcSession = Helper::getWooSession();
 
-        return $pickUpInfo;
+        return $wcSession->get(self::PICKUP_LOCATION_SESSION_VAR_NAME);
     }
 
     public function setCurrentPickUpLocationInfo($pickUpInfo, $orderId = null) {
         $wcSession = Helper::getWooSession();
         $wcSession->set(self::PICKUP_LOCATION_SESSION_VAR_NAME, $pickUpInfo);
-        $this->initSession();
-        $_SESSION[self::PICKUP_LOCATION_SESSION_VAR_NAME] = $pickUpInfo;
 
         Logger::debug(
             'Changing the saved pickup data',
@@ -92,12 +84,6 @@ class PickupSelection {
                 'saved'      => $this->getCurrentPickUpLocationInfo(),
             ]
         );
-    }
-
-    private function initSession() {
-        if (empty(session_id()) || session_status() !== PHP_SESSION_ACTIVE) {
-            @session_start();
-        }
     }
 
     public function getAjaxUrl() {

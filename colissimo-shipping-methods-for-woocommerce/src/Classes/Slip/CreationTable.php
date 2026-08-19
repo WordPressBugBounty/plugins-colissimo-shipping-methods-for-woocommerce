@@ -163,9 +163,11 @@ class CreationTable extends WP_List_Table {
     }
 
     protected function getOrdersByIds(array $ids) {
-        return array_map(
-            fn($id) => wc_get_order($id),
-            $ids
+        return array_filter(
+            array_map(
+                fn($id) => wc_get_order($id),
+                $ids
+            )
         );
     }
 

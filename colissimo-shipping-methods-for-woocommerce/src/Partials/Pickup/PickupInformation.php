@@ -34,7 +34,7 @@ if (!empty($relay)) {
 					<img class="lpc_pickup_marker" src="<?php echo esc_url(Helper::getImageUrl('map_marker.png')); ?>">
 					<span class="lpc_pickup_info_distance_txt">
 						<?php // translators: %d is the distance to the relay in meters ?>
-						<?php echo esc_html(sprintf(__('AT %dm', 'colissimo-shipping-methods-for-woocommerce'), $relay['distanceEnMetre'])); ?>
+                        <?php echo esc_html(sprintf(__('AT %dm', 'colissimo-shipping-methods-for-woocommerce'), $relay['distanceEnMetre'])); ?>
 					</span>
 				</div>
             <?php } ?>
@@ -46,14 +46,21 @@ if (!empty($relay)) {
                         ?>
 						<div class="tooltip-box">
 							<div class="tooltip-text">
-                                <?php echo esc_html($openTime); ?>
+                                <?php
+                                echo wp_kses(
+                                    $openTime,
+                                    [
+                                        'br' => [],
+                                    ]
+                                );
+                                ?>
 							</div>
 						</div>
                     <?php } ?>
 				</div>
 				<div class="lpc_pickup_info_address_line"><?php echo esc_html($relay['adresse1']); ?></div>
 				<div class="lpc_pickup_info_address_line"><?php echo esc_html($relay['codePostal']) . ' ' . esc_html($relay['localite']); ?></div>
-				<div class="lpc_pickup_info_address_line"><?php echo esc_html($relay['libellePays']); ?></div>
+				<div class="lpc_pickup_info_address_line"><?php echo esc_html(empty($relay['libellePays']) ? ($relay['codePays'] ?? '') : $relay['libellePays']); ?></div>
 			</div>
 		</div>
 	</div>

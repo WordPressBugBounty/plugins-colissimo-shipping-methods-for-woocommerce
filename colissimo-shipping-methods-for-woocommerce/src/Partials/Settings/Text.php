@@ -4,7 +4,7 @@
 use Colissimo\Helpers\Helper;
 
 defined('ABSPATH') || die('Restricted Access');
-$value = Helper::get_option($args['field_name'], $args['default'] ?? '');
+$value = Helper::get_option($args['field_name'] ?? $args['id'], $args['default'] ?? '');
 ?>
 <tr class="<?php echo esc_attr($args['row_class'] ?? ''); ?>">
 	<th scope="row">

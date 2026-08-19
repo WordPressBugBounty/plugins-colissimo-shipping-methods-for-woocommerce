@@ -299,4 +299,17 @@ defined('ABSPATH') || die('Restricted Access');
 	}, 10, 1);
 		</pre>
 	</div>
+	<div>
+		<h3>lpc_invoice_item_additional_information</h3>
+		<p>src/Classes/Order/InvoiceGenerateAction.php</p>
+		<p>This filter allows you to add additional information under each item's name in the generated invoice.
+			The value returned must be a HTML string, it is escaped with wp_kses_post before being displayed.</p>
+		<p>Example:</p>
+		<pre>
+	add_filter('lpc_invoice_item_additional_information', function($additionalInformation, $order, $itemId, $item){
+		$additionalInformation = '&lt;br&gt;' . $item->get_product()->get_sku();
+		return $additionalInformation;
+	}, 10, 4);
+		</pre>
+	</div>
 </div>

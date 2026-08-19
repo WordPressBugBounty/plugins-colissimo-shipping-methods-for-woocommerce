@@ -2,6 +2,7 @@
 
 namespace Colissimo\Api;
 
+use Colissimo\Core\Register;
 use Colissimo\Helpers\Logger;
 use Colissimo\Helpers\Helper;
 use Exception;
@@ -40,6 +41,14 @@ class SlipGenerationApi extends RestApi {
             $request['password']       = Helper::getPasswordWebService();
         }
 
+        $parentAccountId = Register::get('accountApi')->getParentAccountId();
+        if (!empty($parentAccountId)) {
+            $request['fields']['field'][] = [
+                'key'   => 'ACCOUNT_NUMBER',
+                'value' => $parentAccountId,
+            ];
+        }
+
         $response = $this->query('generateBordereauByParcelsNumbers', $request, $headers);
 
         $jsonResponse = $response['<jsonInfos>'] ?? [];
@@ -61,7 +70,7 @@ class SlipGenerationApi extends RestApi {
                 __METHOD__ . 'error in API response',
                 ['response' => $jsonResponse['messages']]
             );
-            throw new Exception('Error when generating bordereau: ' . esc_html($jsonResponse['messages']['messageContent']));
+            throw new Exception('Error when generating bordereau: ' . esc_html($jsonResponse['messages'][0]['messageContent'] ?? ''));
         }
 
         return $response;

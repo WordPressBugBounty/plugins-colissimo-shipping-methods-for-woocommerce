@@ -72,8 +72,10 @@ $oneRelay = $args['oneRelay'];
 		</div>
 	</div>
 	<div class="lpc_relay_choose_btn">
-		<a class="lpc_show_relay_details"><?php esc_html_e('Display on map', 'colissimo-shipping-methods-for-woocommerce'); ?></a>
-		<button class="lpc_relay_choose" type="button" data-relayindex="<?php echo esc_attr($i); ?>">
+		<button type="button" class="lpc_show_relay_details wp-element-button">
+            <?php esc_html_e('Display on map', 'colissimo-shipping-methods-for-woocommerce'); ?>
+		</button>
+		<button type="button" class="lpc_relay_choose wp-element-button" data-relayindex="<?php echo esc_attr($i); ?>">
             <?php esc_html_e('Choose', 'colissimo-shipping-methods-for-woocommerce'); ?>
 		</button>
 	</div>

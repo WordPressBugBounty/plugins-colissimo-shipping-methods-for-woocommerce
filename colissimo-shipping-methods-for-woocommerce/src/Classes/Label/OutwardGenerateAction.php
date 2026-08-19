@@ -52,6 +52,11 @@ class OutwardGenerateAction {
         $urlRedirection = admin_url('admin.php?page=wc_colissimo_view');
         $orderId        = Helper::getVar(self::ACTION_ID_PARAM_NAME);
         $order          = wc_get_order($orderId);
+        if (empty($order)) {
+            wp_safe_redirect($urlRedirection);
+
+            return;
+        }
 
         $items = OrderQueries::getOrderItems($order);
         $this->labelGenerationOutward->generate($order, ['items' => $items], true);

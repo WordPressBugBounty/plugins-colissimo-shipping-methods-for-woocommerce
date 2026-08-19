@@ -642,9 +642,11 @@ class Table extends WP_List_Table {
     }
 
     protected function getOrdersByIds(array $ids) {
-        return array_map(
-            fn($id) => wc_get_order($id),
-            $ids
+        return array_filter(
+            array_map(
+                fn($id) => wc_get_order($id),
+                $ids
+            )
         );
     }
 
@@ -764,11 +766,11 @@ class Table extends WP_List_Table {
 		<script type="text/javascript">
             jQuery(function ($) {
                 setTimeout(() => {
-                    const infos = {
-                        pdfUrl: '<?php echo esc_url($labelPrintActionUrl); ?>',
-                        labelType: '<?php echo esc_html($labelType); ?>',
-                        trackingNumbers: '<?php echo esc_html($stringTrackingNumbers); ?>'
-                    };
+					const infos = {
+						pdfUrl: <?php echo wp_json_encode(esc_url_raw($labelPrintActionUrl)); ?>,
+						labelType: <?php echo wp_json_encode($labelType); ?>,
+						trackingNumbers: <?php echo wp_json_encode($stringTrackingNumbers); ?>
+					};
 
                     lpc_print_labels(infos);
                 }, 1000);

@@ -104,7 +104,7 @@ class CapabilitiesPerCountry {
             }
         }
 
-        return !is_null($this->capabilitiesByCountry) ? $this->capabilitiesByCountry[$countryCode] : [];
+        return $this->capabilitiesByCountry[$countryCode] ?? [];
     }
 
     public function getProductCodeForOrder(WC_Order $order) {
@@ -226,12 +226,13 @@ class CapabilitiesPerCountry {
      */
     public function getCapabilitiesFileMethod($methodId) {
         $methods = [
-            NoSign::ID    => 'domiciless',
-            Sign::ID      => 'domicileas',
-            SignDdp::ID   => 'domicileasddp',
-            Relay::ID     => 'pr',
-            Expert::ID    => 'expert',
-            ExpertDdp::ID => 'expertddp',
+            NoSign::ID      => 'domiciless',
+            Sign::ID        => 'domicileas',
+            SignDdp::ID     => 'domicileasddp',
+            Relay::ID       => 'pr',
+            Expert::ID      => 'expert',
+            ExpertDdp::ID   => 'expertddp',
+            EcoOverseas::ID => 'ecoom',
         ];
 
         return empty($methods[$methodId]) ? $methodId : $methods[$methodId];

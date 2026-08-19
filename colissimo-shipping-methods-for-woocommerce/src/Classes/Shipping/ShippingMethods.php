@@ -28,12 +28,13 @@ class ShippingMethods {
         add_filter(
             'woocommerce_shipping_methods',
             function ($shippingMethods) {
-                $shippingMethods[Expert::ID]    = Expert::class;
-                $shippingMethods[ExpertDdp::ID] = ExpertDdp::class;
-                $shippingMethods[NoSign::ID]    = NoSign::class;
-                $shippingMethods[Relay::ID]     = Relay::class;
-                $shippingMethods[Sign::ID]      = Sign::class;
-                $shippingMethods[SignDdp::ID]   = SignDdp::class;
+                $shippingMethods[EcoOverseas::ID] = EcoOverseas::class;
+                $shippingMethods[Expert::ID]      = Expert::class;
+                $shippingMethods[ExpertDdp::ID]   = ExpertDdp::class;
+                $shippingMethods[NoSign::ID]      = NoSign::class;
+                $shippingMethods[Relay::ID]       = Relay::class;
+                $shippingMethods[Sign::ID]        = Sign::class;
+                $shippingMethods[SignDdp::ID]     = SignDdp::class;
 
                 return $shippingMethods;
             }
@@ -46,6 +47,7 @@ class ShippingMethods {
     public function getAllShippingMethods(): array {
         // can't use ::ID here because WC may not yet be defined
         return [
+            'lpc_ecoom'      => __('Colissimo ECO Overseas', 'colissimo-shipping-methods-for-woocommerce'),
             'lpc_expert'     => __('Colissimo International', 'colissimo-shipping-methods-for-woocommerce'),
             'lpc_expert_ddp' => __('Colissimo International - DDP Option', 'colissimo-shipping-methods-for-woocommerce'),
             'lpc_nosign'     => __('Colissimo without signature', 'colissimo-shipping-methods-for-woocommerce'),
@@ -223,7 +225,7 @@ class ShippingMethods {
 
             $optionName = 'woocommerce_' . $shippingMethod->id . '_' . $shippingMethod->instance_id . '_settings';
             $option     = Helper::get_option($optionName, []);
-            if ('no' !== $globalMethods[$shippingMethod->id]) {
+            if ('no' !== ($globalMethods[$shippingMethod->id] ?? 'no')) {
                 if (!empty($option)) {
                     $option['always_free'] = $globalMethods[$shippingMethod->id];
                     update_option($optionName, $option);

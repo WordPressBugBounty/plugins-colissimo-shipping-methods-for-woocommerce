@@ -67,6 +67,9 @@ class ShippingZones {
                 if (!empty($countryDefinition['pr'])) {
                     $shippingMethods['lpc_relay'] = true;
                 }
+                if (!empty($countryDefinition['ecoom'])) {
+                    $shippingMethods['lpc_ecoom'] = true;
+                }
             }
 
             $this->addCustomZone(
@@ -78,7 +81,9 @@ class ShippingZones {
             );
         }
 
-        $this->addCustomZonesDone = true;
+        if (empty($zoneName)) {
+            $this->addCustomZonesDone = true;
+        }
     }
 
     protected function addCustomZone($zoneName, array $countries, array $shippingMethods, array $currentZones, array $defaultPrices) {

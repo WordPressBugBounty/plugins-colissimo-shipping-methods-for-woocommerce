@@ -548,61 +548,22 @@
     {
       "id": "lpc_section_zpldpl_labels",
       "type": "title",
-      "title": "ZPL/DPL labels printing"
+      "title": "ZPL/DPL labels printing",
+      "desc": "Thermal (ZPL/DPL) labels are printed through QZ Tray. Install and run QZ Tray on the computer connected to the thermal printer, then choose the printer below."
     },
     {
-      "id": "lpc_zpldpl_labels_port",
-      "type": "select",
-      "title": "Port",
-      "class": "",
-      "default": "USB",
-      "options": {
-        "USB": "USB",
-        "ETHERNET": "Ethernet"
-      }
+      "id": "lpc_qz_guide",
+      "type": "lpc_qz_guide",
+      "title": "QZ Tray setup guide"
     },
     {
-      "id": "lpc_zpldpl_labels_ip",
+      "id": "lpc_zpldpl_labels_printer",
       "type": "text",
-      "title": "IP address",
-      "class": "",
-      "row_class": "lpc_zpldpl_labels_ip_container",
+      "title": "Thermal printer",
+      "class": "lpc_zpldpl_labels_printer",
       "default": "",
-      "desc": "IPV4 format IP address.",
-      "desc_tip": true,
-      "placeholder": "192.168.0.100"
-    },
-    {
-      "id": "lpc_zpldpl_labels_protocol",
-      "type": "select",
-      "title": "Protocol",
-      "class": "",
-      "row_class": "lpc_zpldpl_labels_protocol_container",
-      "default": "DATAMAX",
-      "options": {
-        "DATAMAX": "DATAMAX",
-        "INTERMEC": "INTERMEC",
-        "ZEBRA": "ZEBRA"
-      }
-    },
-    {
-      "id": "lpc_zpldpl_labels_urlport",
-      "type": "text",
-      "title": "URL port",
-      "class": "",
-      "default": "8000",
-      "placeholder": "8000"
-    },
-    {
-      "id": "lpc_zpldpl_labels_urlprotocol",
-      "type": "select",
-      "title": "URL protocol",
-      "class": "",
-      "default": "HTTP",
-      "options": {
-        "HTTP": "HTTP",
-        "HTTPS": "HTTPS"
-      }
+      "desc": "Printer name as detected by QZ Tray. Leave empty to use the QZ Tray default printer.",
+      "desc_tip": true
     },
     {
       "id": "lpc_section_zpldpl_labels",
@@ -1040,6 +1001,25 @@
     },
     {
       "id": "lpc_relay",
+      "type": "sectionend"
+    },
+    {
+      "id": "lpc_ecoom",
+      "type": "title",
+      "title": "Colissimo ECO Overseas",
+      "desc": "This offer is only available for shipments to Guadeloupe, French Guiana, Reunion Island, Martinique and Mayotte, shipped from mainland France. Make sure this offer is enabled on your Colissimo account before activating it. Indicative delivery times: D+21 for Guadeloupe and Martinique, D+29 for French Guiana, D+31 for Reunion Island, D+48 for Mayotte."
+    },
+    {
+      "id": "lpc_ecoom_FreeFromOrderValue",
+      "type": "number",
+      "title": "Free from order value",
+      "desc": "Shipping cost will be free if the order value is over the given one (only applied if this field is strictly positive).",
+      "desc_tip": true,
+      "class": "",
+      "default": ""
+    },
+    {
+      "id": "lpc_ecoom",
       "type": "sectionend"
     }
   ],

@@ -2,6 +2,7 @@
 
 namespace Colissimo\Api;
 
+use Colissimo\Core\Register;
 use Colissimo\Helpers\Logger;
 use Colissimo\Helpers\Helper;
 use Exception;
@@ -42,9 +43,8 @@ class PickupWidgetApi extends RestApi {
                 ];
             }
 
-            $parentAccountId = Helper::get_option('lpc_parent_account');
-            // Some users enter their email address in here for some reason
-            if (!empty($parentAccountId) && strpos($parentAccountId, '@') === false) {
+            $parentAccountId = Register::get('accountApi')->getParentAccountId();
+            if (!empty($parentAccountId)) {
                 $credentials['partnerClientCode'] = $parentAccountId;
             }
 

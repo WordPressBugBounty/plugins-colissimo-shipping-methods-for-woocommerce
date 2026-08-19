@@ -371,6 +371,11 @@ class Update {
                 }
             }
         }
+
+        if (version_compare($versionInstalled, '3.1.0', '<')) {
+            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
+            $this->shippingZones->addCustomZonesOrUpdateOne('OM1');
+        }
     }
 
     /** Functions for update to 1.3 **/
@@ -400,7 +405,10 @@ class Update {
     }
 
     public function doMigration13() {
-        $orderIdsToMigrate = json_decode(Helper::get_option(self::LPC_ORDERS_TO_MIGRATE_OPTION_NAME));
+        $orderIdsToMigrate = json_decode(Helper::get_option(self::LPC_ORDERS_TO_MIGRATE_OPTION_NAME), true);
+        if (!is_array($orderIdsToMigrate)) {
+            $orderIdsToMigrate = [];
+        }
 
         if (0 === count($orderIdsToMigrate)) {
             $timestamp = wp_next_scheduled(self::LPC_MIGRATION13_HOOK_NAME);

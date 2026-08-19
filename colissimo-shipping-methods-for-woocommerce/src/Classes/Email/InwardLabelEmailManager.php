@@ -55,7 +55,7 @@ class InwardLabelEmailManager {
     public function control() {
         if (!current_user_can('lpc_send_emails')) {
             header('HTTP/1.0 401 Unauthorized');
-            $this->handleErrorRedirect('Unauthorized access');
+            $this->handleErrorRedirect('Unauthorized access to inward label sending');
         }
 
         $trackingNumber = Helper::getVar(self::TRACKING_NUMBER_VAR_NAME);
@@ -63,24 +63,17 @@ class InwardLabelEmailManager {
 
         switch ($redirection) {
             case LabelQueries::REDIRECTION_WOO_ORDER_EDIT_PAGE:
-                $orderId        = $this->inwardLabelDb->getOrderIdByTrackingNumber($trackingNumber);
-                $order          = wc_get_order($orderId);
-                $urlRedirection = $order->get_edit_order_url();
-                break;
+                $orderId = $this->inwardLabelDb->getOrderIdByTrackingNumber($trackingNumber);
+                $order   = wc_get_order($orderId);
+                if (!empty($order)) {
+                    $urlRedirection = $order->get_edit_order_url();
+                    break;
+                }
+            // We didn't find the order, redirect to the default page
             case LabelQueries::REDIRECTION_COLISSIMO_ORDERS_LISTING:
             default:
                 $urlRedirection = admin_url('admin.php?page=wc_colissimo_view');
                 break;
-        }
-
-        if (!current_user_can('lpc_send_emails')) {
-            header('HTTP/1.0 401 Unauthorized');
-
-            return $this->ajaxDispatcher->makeAndLogError(
-                [
-                    'message' => 'unauthorized access to inward label sending',
-                ]
-            );
         }
 
         try {
@@ -88,7 +81,10 @@ class InwardLabelEmailManager {
             $lpcInwardLabelGenerationEmail = new InwardLabelGenerationEmail();
             $label                         = $this->inwardLabelDb->getLabelFor($trackingNumber);
             $order                         = wc_get_order($label['order_id']);
-            $sent                          = $lpcInwardLabelGenerationEmail->trigger($order, $label['label']);
+            if (empty($order)) {
+                $this->handleErrorRedirect(__('Label was not sent', 'colissimo-shipping-methods-for-woocommerce'));
+            }
+            $sent = $lpcInwardLabelGenerationEmail->trigger($order, $label['label']);
             // TODO: Try to find a better way for the admin_notices
             $lpc_admin_notices = Register::get('lpcAdminNotices');
             if ($sent) {
@@ -112,5 +108,15 @@ class InwardLabelEmailManager {
         return $this->ajaxDispatcher->getUrlForTask(self::AJAX_TASK_NAME)
                . '&' . self::TRACKING_NUMBER_VAR_NAME . '=' . $trackingNumber
                . '&' . self::REDIRECTION_VAR_NAME . '=' . $redirection;
+    }
+
+    private function handleErrorRedirect(string $errorMessage) {
+        echo wp_json_encode(
+            [
+                'type'  => 'error',
+                'error' => $errorMessage,
+            ]
+        );
+        exit;
     }
 }

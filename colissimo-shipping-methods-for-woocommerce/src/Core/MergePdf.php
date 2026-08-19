@@ -2,7 +2,7 @@
 
 namespace Colissimo\Core;
 
-use Colissimo\Vendor\setasign\Fpdi\Tcpdf\Fpdi;
+defined('ABSPATH') || die('Restricted Access');
 
 class MergePdf {
     const DESTINATION__INLINE = 'I';
@@ -21,7 +21,7 @@ class MergePdf {
             $outputPath = self::DEFAULT_MERGED_FILE_NAME;
         }
 
-        $pdf = new Fpdi();
+        $pdf = new FpdiPdf();
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
         self::join($pdf, $files);

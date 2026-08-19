@@ -54,6 +54,11 @@ class InwardGenerateAction {
         $orderId        = Helper::getVar(self::ACTION_ID_PARAM_NAME);
         $outwardLabelId = Helper::getVar(self::ACTION_OUTWARD_LABEL_ID_PARAM_NAME);
         $order          = wc_get_order($orderId);
+        if (empty($order)) {
+            wp_safe_redirect($urlRedirection);
+
+            return;
+        }
 
         $customParams = [
             'items'                => OrderQueries::getOrderItems($order),

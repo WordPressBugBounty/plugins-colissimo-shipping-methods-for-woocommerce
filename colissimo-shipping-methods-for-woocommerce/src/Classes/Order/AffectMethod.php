@@ -112,7 +112,7 @@ class AffectMethod {
         }
 
         $lpcMethods           = $this->getColissimoShippingMethodsAvailable($order);
-        $lpcNewShippingMethod = $lpcMethods[$lpcNewShippingMethodId];
+        $lpcNewShippingMethod = $lpcMethods[$lpcNewShippingMethodId] ?? null;
 
         if (empty($lpcNewShippingMethod)) {
             Helper::endAjax(false, ['message' => __('Please select a shipping method', 'colissimo-shipping-methods-for-woocommerce')]);
@@ -166,6 +166,9 @@ class AffectMethod {
             $order->save();
         } else {
             $shippingItem = $order->get_item($orderShippingItemId);
+            if (empty($shippingItem)) {
+                Helper::endAjax(false, ['message' => 'Shipping item not found']);
+            }
             $shippingItem->set_props(
                 [
                     'method_id'    => $lpcNewShippingMethod->id,

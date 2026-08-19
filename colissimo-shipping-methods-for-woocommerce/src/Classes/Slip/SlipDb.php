@@ -40,7 +40,7 @@ class SlipDb {
             $wpdb->prepare(
                 'INSERT INTO ' . $wpdb->prefix . 'lpc_bordereau(`bordereau_external_id`, `created_at`, `delivery_slip`) VALUES(%d, %s, %s)',
                 $bordereauId,
-                gmdate('Y - m - d H:i:s', strtotime($creationDate)),
+                gmdate('Y-m-d H:i:s', strtotime($creationDate)),
                 $deliverySlip
             )
         );

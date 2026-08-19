@@ -6,8 +6,8 @@ namespace Colissimo\Classes\Order;
 use Colissimo\Core\Ajax;
 use Colissimo\Helpers\Logger;
 use Colissimo\Helpers\Helper;
+use Colissimo\Core\Pdf;
 use Colissimo\Core\Register;
-use ColissimoTCPDF;
 use Exception;
 use WC_Order;
 
@@ -24,10 +24,10 @@ class InvoiceGenerateAction {
     public function generateInvoice($orderId, $filename, $destination) {
         try {
             $order = wc_get_order($orderId);
-            $pdf   = new ColissimoTCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-            $pdf->SetMargins(PDF_MARGIN_LEFT, 5, PDF_MARGIN_RIGHT);
-            $pdf->SetHeaderMargin(PDF_MARGIN_HEADER);
-            $pdf->SetFooterMargin(PDF_MARGIN_FOOTER);
+            $pdf   = new Pdf(Pdf::PAGE_ORIENTATION, Pdf::UNIT, Pdf::PAGE_FORMAT, true, 'UTF-8', false);
+            $pdf->SetMargins(Pdf::MARGIN_LEFT, 5, Pdf::MARGIN_RIGHT);
+            $pdf->SetHeaderMargin(Pdf::MARGIN_HEADER);
+            $pdf->SetFooterMargin(Pdf::MARGIN_FOOTER);
             $pdf->SetPrintHeader(false);
             $pdf->SetPrintFooter(false);
             $pdf->addPage();
@@ -153,6 +153,13 @@ class InvoiceGenerateAction {
              * @since 2.1.0
              */
             $productsArray .= wp_kses_post(apply_filters('woocommerce_order_item_name', $item->get_name(), $item, false));
+
+            /**
+             * Filter on the additional information displayed under the item name in the invoice
+             *
+             * @since 3.1.0
+             */
+            $productsArray .= wp_kses_post(apply_filters('lpc_invoice_item_additional_information', '', $order, $item_id, $item));
             $productsArray .= '</td>';
 
             // Item quantity

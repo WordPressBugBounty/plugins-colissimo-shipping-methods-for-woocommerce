@@ -61,17 +61,65 @@ jQuery(function ($) {
     }
 
     function thermalPrint() {
-        const $ipContainer = $('.wc-settings-row-lpc_zpldpl_labels_ip_container');
-        const $protocolContainer = $('.wc-settings-row-lpc_zpldpl_labels_protocol_container');
-        $('#lpc_zpldpl_labels_port').on('change', function () {
-            if ('USB' === $(this).val()) {
-                $ipContainer.hide();
-                $protocolContainer.show();
-            } else {
-                $ipContainer.show();
-                $protocolContainer.hide();
+        const $printerField = $('#lpc_zpldpl_labels_printer');
+        if (!$printerField.length) {
+            return;
+        }
+
+        // Dropdown of printers detected by QZ Tray; selecting one fills the manual field.
+        const $select = $('<select id="lpc_zpldpl_labels_printer_select" style="display:block;margin-bottom:6px;"></select>');
+        const $status = $('<p class="description" style="margin-top:4px;"></p>');
+        $printerField.before($select);
+        $printerField.after($status);
+
+        $select.on('change', function () {
+            const value = $(this).val();
+            if (value) {
+                $printerField.val(value);
             }
-        }).trigger('change');
+        });
+
+        if ('undefined' === typeof qz || !qz.websocket) {
+            $select.hide();
+            $status.text(lpcThermalSettings.unavailable);
+            return;
+        }
+
+        $status.text(lpcThermalSettings.detecting);
+        $select.append($('<option></option>').val('').text(lpcThermalSettings.select));
+
+        qz.api.setPromiseType(function (resolver) {
+            return new Promise(resolver);
+        });
+
+        const finish = function () {
+            if (qz.websocket.isActive()) {
+                qz.websocket.disconnect();
+            }
+        };
+
+        qz.websocket.connect().then(function () {
+            return qz.printers.find();
+        }).then(function (printers) {
+            const list = Array.isArray(printers) ? printers : [printers];
+            const current = $printerField.val();
+
+            list.forEach(function (printer) {
+                const $option = $('<option></option>').val(printer).text(printer);
+                if (printer === current) {
+                    $option.prop('selected', true);
+                }
+                $select.append($option);
+            });
+
+            $status.text('');
+            finish();
+        }).catch(function (error) {
+            console.warn('QZ Tray printer detection failed', error);
+            $select.hide();
+            $status.text(lpcThermalSettings.unavailable);
+            finish();
+        });
     }
 
     function extraCost() {

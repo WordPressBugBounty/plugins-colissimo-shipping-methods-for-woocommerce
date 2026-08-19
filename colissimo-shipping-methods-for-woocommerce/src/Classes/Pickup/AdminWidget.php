@@ -76,7 +76,7 @@ class AdminWidget {
         foreach ($items as $item) {
             if (!empty($item['product_id'])) {
                 $product = $item->get_product();
-                if (!$product->is_virtual()) {
+                if (!empty($product) && !$product->is_virtual()) {
                     $weight += wc_get_weight($product->get_weight(), 'g') * $item['quantity'];
                 }
             }

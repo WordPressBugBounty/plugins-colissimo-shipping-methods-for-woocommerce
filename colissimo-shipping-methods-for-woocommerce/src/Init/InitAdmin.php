@@ -4,6 +4,7 @@ namespace Colissimo\Init;
 
 use Colissimo\Classes\Label\LabelQueries;
 use Colissimo\Classes\Label\LabelPrintAction;
+use Colissimo\Classes\Label\LabelPurge;
 use Colissimo\Classes\Label\InwardGenerateAction;
 use Colissimo\Classes\Label\InwardDeleteAction;
 use Colissimo\Classes\Label\InwardDownloadAction;
@@ -27,6 +28,7 @@ use Colissimo\Classes\Settings\Coupons;
 use Colissimo\Classes\Settings\Download;
 use Colissimo\Classes\Settings\ShippingRates;
 use Colissimo\Classes\Settings\SettingsTab;
+use Colissimo\Classes\Settings\SimulationAction;
 use Colissimo\Classes\Slip\CreationTable;
 use Colissimo\Classes\Slip\HistoryTable;
 use Colissimo\Classes\Slip\SlipQueries;
@@ -86,6 +88,7 @@ class InitAdmin {
         Register::register('wooOrdersTableAction', new TableAction());
         Register::register('wooOrdersTableBulkActions', new TableBulkActions());
         Register::register('shippingRates', new ShippingRates());
+        Register::register('simulationAction', new SimulationAction());
         Register::register('LpcAdminProduct', new Product());
         Register::register('LpcAdminProductCategory', new ProductCategory());
 
@@ -160,6 +163,9 @@ class InitAdmin {
         } elseif ('slip-history' === $args['tab']) {
             $args['table'] = new HistoryTable();
             Helper::renderPartial('Order/SlipHistory.php', $args);
+        } elseif ('simulation' === $args['tab']) {
+            $args['countries'] = WC()->countries->get_countries();
+            Helper::renderPartial('Order/Simulation.php', $args);
         }
     }
 
@@ -196,7 +202,16 @@ class InitAdmin {
 
         if (10 <= $numberOfLabels) {
             // Open a popup asking if the user wants to give feedback, with a dismiss button
-            $modal = new Modal('', __('Plugin feedback', 'colissimo-shipping-methods-for-woocommerce'));
+            $content = '<div id="feedback_prompt_container">';
+            $content .= '<div id="feedback_prompt_message">' . esc_html__('Would you like to help us improve our plugin by answering our questionnaire?',
+                                                                          'colissimo-shipping-methods-for-woocommerce') . '</div>';
+            $content .= '<button type="button" class="button-secondary" id="lpc-feedback-close-button">' . esc_html__('No, thanks',
+                                                                                                                      'colissimo-shipping-methods-for-woocommerce') . '</button>';
+            $formUrl = admin_url('admin.php?page=wc-settings&tab=lpc&section=feedback');
+            $content .= '<a href="' . esc_url($formUrl) . '" class="button-primary">' . esc_html__('Sure, why not!', 'colissimo-shipping-methods-for-woocommerce') . '</a>';
+            $content .= '</div>';
+
+            $modal = new Modal($content, __('Plugin feedback', 'colissimo-shipping-methods-for-woocommerce'));
             $modal->loadScripts();
             $modal->open_modal('Feedback');
         }
@@ -208,49 +223,50 @@ class InitAdmin {
             return;
         }
 
-        $adminNotices  = Register::get('lpcAdminNotices');
-        $notifications = [
-            'inward_label_sent',
-            'outward_label_generate',
-            'inward_label_generate',
-            'cdi_warning',
-            'outward_label_delete',
-            'inward_label_delete',
-            'label_migration',
-            'jquery_warning',
-            'jquery_migrate_wp56',
-            'lpc_notice',
-            'bordereau_delete',
-            'insurance_unavailable_for_country',
-            'shipment_change',
-            'country_capaibilities_import',
-            'shipping_statuses_updated',
-            'credentials_validity',
-            'cgv_invalid',
-            'deprecated_methods',
-            'credentials_apikey',
-        ];
-        foreach ($notifications as $oneNotification) {
-            $notice_content = $adminNotices->get_notice($oneNotification);
-            if ($notice_content) {
-                echo wp_kses(
-                    $notice_content,
-                    [
-                        'div'  => [
-                            'class' => [],
-                        ],
-                        'p'    => [],
-                        'br'   => [],
-                        'a'    => [
-                            'href'   => [],
-                            'target' => [],
-                        ],
-                        'span' => [
-                            'style' => [],
-                        ],
-                    ]
-                );
-            }
+        $adminNotices = Register::get('lpcAdminNotices');
+        $notices      = $adminNotices->get_notices(
+            [
+                'inward_label_sent',
+                'outward_label_generate',
+                'inward_label_generate',
+                'cdi_warning',
+                'outward_label_delete',
+                'inward_label_delete',
+                'label_migration',
+                'jquery_warning',
+                'jquery_migrate_wp56',
+                'lpc_notice',
+                'bordereau_delete',
+                'insurance_unavailable_for_country',
+                'shipment_change',
+                'country_capabilities_import',
+                'shipping_statuses_updated',
+                'credentials_validity',
+                'cgv_invalid',
+                'deprecated_methods',
+                'credentials_apikey',
+                'credentials_account_number',
+            ]
+        );
+
+        foreach ($notices as $notice_content) {
+            echo wp_kses(
+                $notice_content,
+                [
+                    'div'  => [
+                        'class' => [],
+                    ],
+                    'p'    => [],
+                    'br'   => [],
+                    'a'    => [
+                        'href'   => [],
+                        'target' => [],
+                    ],
+                    'span' => [
+                        'style' => [],
+                    ],
+                ]
+            );
         }
     }
 
@@ -311,9 +327,13 @@ class InitAdmin {
             );
         }
 
-        $purgeLabels = Helper::get_option('lpc_day_purge', 30);
-        if (!empty($purgeLabels) && !wp_next_scheduled('purge_colissimo_labels')) {
-            wp_schedule_event(time(), 'daily', 'purge_colissimo_labels');
+        if (LabelPurge::getPurgeDelay() > 0) {
+            if (!wp_next_scheduled('purge_colissimo_labels')) {
+                wp_schedule_event(time(), 'daily', 'purge_colissimo_labels');
+            }
+        } elseif (wp_next_scheduled('purge_colissimo_labels')) {
+            // The purge has been disabled from the settings, unschedule the event instead of leaving it running
+            wp_clear_scheduled_hook('purge_colissimo_labels');
         }
     }
 

@@ -106,11 +106,11 @@ class AdminWebService {
             $orderId = (int) Helper::getVar('orderId', 0);
             if ($orderId > 0) {
                 $order = wc_get_order($orderId);
-                $items = $order->get_items();
+                $items = empty($order) ? [] : $order->get_items();
                 foreach ($items as $item) {
                     if (!empty($item['product_id'])) {
                         $product = $item->get_product();
-                        if (!$product->is_virtual()) {
+                        if (!empty($product) && !$product->is_virtual()) {
                             $weight += wc_get_weight($product->get_weight(), 'kg') * $item['quantity'];
                         }
                     }

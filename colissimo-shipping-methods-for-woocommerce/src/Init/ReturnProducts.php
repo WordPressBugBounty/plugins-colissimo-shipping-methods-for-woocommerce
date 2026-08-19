@@ -195,11 +195,11 @@ class ReturnProducts {
      */
     private function formatAddress(array $address): array {
         return [
-            'company'   => $address['companyName'],
-            'address_1' => $address['street'],
-            'city'      => $address['city'],
-            'postcode'  => $address['zipCode'],
-            'country'   => $address['countryCode'],
+            'company'   => $address['companyName'] ?? '',
+            'address_1' => $address['street'] ?? '',
+            'city'      => $address['city'] ?? '',
+            'postcode'  => $address['zipCode'] ?? '',
+            'country'   => $address['countryCode'] ?? '',
         ];
     }
 
@@ -342,6 +342,10 @@ class ReturnProducts {
      * Call API to confirm pickup
      */
     private function sendPickUpConfirmation($payload, $returnTrackingNumber) {
+        if (empty($this->listMailBoxPickingDatesResponse['mailBoxPickingDates'][0])) {
+            return false;
+        }
+
         $payload['mailBoxPickingDate'] = $this->listMailBoxPickingDatesResponse['mailBoxPickingDates'][0];
         $payload['parcelNumber']       = $returnTrackingNumber;
 

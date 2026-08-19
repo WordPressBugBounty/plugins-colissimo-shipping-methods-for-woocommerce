@@ -3,7 +3,7 @@ Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 6.2
 Tested up to: 7.0
-Stable tag: 3.0.1
+Stable tag: 3.1.0
 Requires PHP: 7.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,36 @@ The recipient can follow the journey of their parcel on their customer area and 
 
 
 == Changelog ==
+
+= 3.1.0 =
+
+FONCTIONNALITÉS
+
+- Un nouvel onglet a été ajouté dans le menu "Colissimo" pour simuler un envoi afin d'en connaître le tarif d'expédition
+- La méthode d'envoi Colissimo ECO Outre-Mer a été ajoutée pour les envois vers certains DOM-TOM
+- Une nouvelle intégration avec QZ Tray a été ajoutée afin de gérer l'impression des étiquettes sur les imprimantes thermiques locales. Ce système remplacera à terme le kit d'impression Colissimo.
+
+AMÉLIORATIONS
+
+- La date prévisionnelle de livraison est à présent affichée sur la page de confirmation de commande et sur la page de commande lorsqu'une étiquette a été générée (activable dans les réglages)
+- L'expédition de produits marqués comme dangereux est à présent possible à l'international
+- Le retour du colis à l'expéditeur est maintenant actif pour les envois vers les États-Unis dont l'expédition échoue (rejeté par la douane par exemple)
+- La connexion avec les différents services Colissimo a été modifiée afin de pouvoir gérer les nouveaux comptes Colissimo
+- Le design de la popup des points de retrait Leaflet et Google Maps a été amélioré sur la plupart des thèmes
+- Une modification a été apportée pour une meilleure compatibilité avec les bundles WooCommerce
+- Le système de notifications à l'admin a été revu afin d'améliorer les performances
+- La librairie de gestion des PDF a été modifiée afin de ne pas rentrer en conflit avec d'autres extensions utilisant TCPDF
+- Le fichier .pot a été re-ajouté pour la compatibilité avec Loco Translate
+- Un bouton de rafraîchissement des logs a été ajouté
+
+CORRECTIFS
+
+- Les expéditions vers les îles Las Palmas, Santa Cruz de Tenerife, Ceuta et Melilla utilisent le bon partenaire postal pour la livraison
+- La recherche de points de retrait gère à présent les codes postaux comportant des espaces ou des tirets
+- L'adresse affichée dans l'email de suivi gère correctement la structure HTML
+- La génération d'étiquettes en masse sur le listing Colissimo a été corrigée
+- La date de création des nouveaux bordereaux de dépôt a été corrigée
+
 
 = 3.0.1 =
 

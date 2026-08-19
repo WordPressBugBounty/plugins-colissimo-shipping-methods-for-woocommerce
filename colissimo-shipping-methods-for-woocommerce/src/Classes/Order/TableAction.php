@@ -54,6 +54,11 @@ class TableAction {
 
         $orderId = Helper::getVar(self::ORDER_ID_VAR_NAME);
         $order   = wc_get_order($orderId);
+        if (empty($order)) {
+            wp_safe_redirect($this->getUrlWithWooCommerceFilters('edit.php?post_type=shop_order'));
+
+            return;
+        }
 
         try {
             $this->labelGenerationOutward->generate($order, ['items' => OrderQueries::getOrderItems($order)], true);

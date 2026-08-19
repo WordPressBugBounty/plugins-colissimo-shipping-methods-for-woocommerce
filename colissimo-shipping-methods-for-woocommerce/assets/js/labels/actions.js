@@ -98,26 +98,130 @@ jQuery(function ($) {
             data: {lpc_thermal_labels_infos: thermalLabelsInfos},
             dataType: 'json'
         }).success(function (response) {
-            const urlsForOrdersId = JSON.parse(response);
+            const labels = JSON.parse(response);
+            if (!labels || 0 === labels.length) {
+                return;
+            }
 
-            urlsForOrdersId.forEach(info => {
-                if (info.url.length !== 0) {
-                    $.ajax({
-                        type: 'GET',
-                        url: info.url,
-                        dataType: 'html'
-                    }).error(function (xhr, status, error) {
-                        console.error('error on label ' + info.trackingNumber);
-                        console.error('Error message: ' + xhr.responseText);
-                        console.error('Error message: ' + error);
-                        if ($('#lpc_thermal_print_error_message').length === 0) {
-                            displayErrors(lpcLabelsActions.errorMsgPrintThermal + ' ' + xhr.responseText + ' URL: ' + info.url);
-                        }
-                    });
-                }
-            });
+            printThermalLabels(labels);
         }).error(function (error) {
             console.error(error);
+        });
+    }
+
+    // Print the thermal labels through QZ Tray, falling back to the legacy print kit URLs
+    // when QZ Tray is not installed/running (e.g. merchant updated but hasn't set it up yet).
+    function printThermalLabels(labels) {
+        if ('undefined' === typeof qz || !qz.websocket) {
+            printThermalLegacy(labels);
+            return;
+        }
+
+        setupQzTray();
+
+        connectQzTray().then(function () {
+            getQzConfig()
+                .then(function (config) {
+                    return printRawSequentially(config, labels);
+                })
+                .then(function () {
+                    disconnectQzTray();
+                })
+                .catch(function (error) {
+                    disconnectQzTray();
+                    console.error(error);
+                    if ($('#lpc_thermal_print_error_message').length === 0) {
+                        displayErrors(lpcLabelsActions.errorMsgPrintThermal + ' ' + error);
+                    }
+                });
+        }, function (connectError) {
+            // Could not reach QZ Tray: fall back to the legacy print kit so existing setups keep working
+            console.warn('QZ Tray unavailable, falling back to the legacy print kit', connectError);
+            printThermalLegacy(labels);
+        });
+    }
+
+    let qzTrayReady = false;
+
+    function setupQzTray() {
+        if (qzTrayReady) {
+            return;
+        }
+
+        qz.api.setPromiseType(function (resolver) {
+            return new Promise(resolver);
+        });
+
+        // QZ Tray runs unsigned here: it prompts the operator to allow printing the first time
+        // (they can tick "remember"). Signed mode can be wired later through qz.security.* if a
+        // certificate is provided.
+
+        qzTrayReady = true;
+    }
+
+    function connectQzTray() {
+        if (qz.websocket.isActive()) {
+            return Promise.resolve();
+        }
+
+        return qz.websocket.connect();
+    }
+
+    function disconnectQzTray() {
+        if (qz.websocket.isActive()) {
+            qz.websocket.disconnect();
+        }
+    }
+
+    function getQzConfig() {
+        const printerName = lpcLabelsActions.qzPrinter;
+        const printerPromise = printerName ? qz.printers.find(printerName) : qz.printers.getDefault();
+
+        return printerPromise.then(function (printer) {
+            return qz.configs.create(printer);
+        });
+    }
+
+    function printRawSequentially(config, labels) {
+        return labels.reduce(function (promise, info) {
+            return promise.then(function () {
+                if (!info.label) {
+                    return null;
+                }
+
+                return qz.print(
+                    config,
+                    [
+                        {
+                            type: 'raw',
+                            format: 'command',
+                            flavor: 'base64',
+                            data: info.label
+                        }
+                    ]
+                );
+            });
+        }, Promise.resolve());
+    }
+
+    function printThermalLegacy(labels) {
+        labels.forEach(function (info) {
+            if (!info.legacyUrl || 0 === info.legacyUrl.length) {
+                return;
+            }
+
+            $.ajax({
+                type: 'GET',
+                url: info.legacyUrl,
+                dataType: 'html'
+            }).error(function (xhr, status, error) {
+                console.error('error on label ' + info.trackingNumber);
+                console.error('Error message: ' + xhr.responseText);
+                console.error('Error message: ' + error);
+                if ($('#lpc_thermal_print_error_message').length === 0) {
+                    displayErrors(lpcLabelsActions.errorMsgPrintThermal + ' ' + xhr.responseText + ' URL: ' + info.legacyUrl);
+                }
+            });
         });
     }
 

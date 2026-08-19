@@ -83,6 +83,7 @@ class SettingsTab {
         $this->initFeedback();
         $this->iniMidCode();
         $this->initShippingDate();
+        $this->initThermalPrintGuide();
     }
 
     private function initSettingsPage() {
@@ -127,6 +128,10 @@ class SettingsTab {
         add_action('woocommerce_admin_field_lpc_deposit_location', [$this, 'displayDepositLocation']);
         add_action('woocommerce_admin_field_lpc_cuttoff', [$this, 'displayShippingDate']);
         add_action('woocommerce_admin_field_lpc_date_format', [$this, 'displayDateFormat']);
+    }
+
+    protected function initThermalPrintGuide() {
+        add_action('woocommerce_admin_field_lpc_qz_guide', [$this, 'displayQzTrayGuide']);
     }
 
     protected function fixSavePassword() {
@@ -379,6 +384,18 @@ class SettingsTab {
                 'type'          => sanitize_title($field['type']),
                 'downloadUrl'   => $this->settingsDownload->getUrl('doc'),
                 'downloadUrlEN' => $this->settingsDownload->getUrl('docEN'),
+            ]
+        );
+    }
+
+    public function displayQzTrayGuide($field) {
+        Helper::renderPartial(
+            'Settings/QzTrayGuide.php',
+            [
+                'title'          => $field['title'],
+                'type'           => sanitize_title($field['type']),
+                'downloadUrl'    => 'https://qz.io/download/',
+                'certificateUrl' => 'https://localhost:8181',
             ]
         );
     }
@@ -903,11 +920,30 @@ class SettingsTab {
      */
     public function settingsSections() {
         wp_enqueue_script(
-            'lpc_settings_settingsjs',
-            Helper::getJsUrl('settings/settings.js'),
-            ['jquery'],
+            'lpc_qz_tray',
+            Helper::getJsUrl('libraries/qz-tray.js'),
+            [],
             LPC_VERSION,
             true
+        );
+
+        wp_enqueue_script(
+            'lpc_settings_settingsjs',
+            Helper::getJsUrl('settings/settings.js'),
+            ['jquery', 'lpc_qz_tray'],
+            LPC_VERSION,
+            true
+        );
+
+        wp_localize_script(
+            'lpc_settings_settingsjs',
+            'lpcThermalSettings',
+            [
+                'detecting'   => __('Detecting printers via QZ Tray…', 'colissimo-shipping-methods-for-woocommerce'),
+                'select'      => __('— Select a detected printer —', 'colissimo-shipping-methods-for-woocommerce'),
+                'unavailable' => __('QZ Tray was not detected. Install and start QZ Tray then reload this page, or type the printer name manually.',
+                                    'colissimo-shipping-methods-for-woocommerce'),
+            ]
         );
 
         $currentTab = $this->getCurrentSection();
@@ -1080,12 +1116,19 @@ class SettingsTab {
         update_option('lpc_accepted_cgv', false, false);
 
         $parentAccountId = Helper::getVar('lpc_parent_account');
+        if (empty($parentAccountId) && AccountApi::PROVIDER_NEW_ACCOUNT === $this->accountApi->getProvider($authentication['credential'])) {
+            $parentAccountId = 'api_key' === Helper::getVar('lpc_credentials_type', 'api_key')
+                ? Helper::getVar('lpc_contract_number')
+                : $authentication['credential']['login'];
+        }
+
         if (!empty($parentAccountId)) {
             $authentication['partnerClientCode'] = $parentAccountId;
         }
 
         $accountInformation = $this->accountApi->getAccountInformation($authentication);
-        $isValid            = !empty($accountInformation);
+
+        $isValid = !empty($accountInformation) || '' !== $this->accountApi->getProvider($authentication['credential']);
         if ($isValid) {
             WC_Admin_Settings::add_message(__('Valid Colissimo credentials', 'colissimo-shipping-methods-for-woocommerce'));
         }
@@ -1158,6 +1201,21 @@ class SettingsTab {
                 ) . "\n" .
                 __('Your Colissimo credentials are incorrect, you won\'t be able to generate labels or show the pickup map to your customers.',
                    'colissimo-shipping-methods-for-woocommerce')
+            );
+
+            return;
+        }
+
+        // The new Colissimo accounts must send their account number in every request, it is read from the credentials fields
+        if ('' === $this->accountApi->getParentAccountId() && $this->accountApi->isNewAccount()) {
+            $this->adminNotices->add_notice(
+                'credentials_account_number',
+                'notice-error',
+                sprintf(
+                // translators: %s is the title of the setting field containing the Colissimo account number.
+                    __('Please fill in the "%s" field of the "General" section, otherwise your deliveries may be interrupted.', 'colissimo-shipping-methods-for-woocommerce'),
+                    __('Contract number', 'colissimo-shipping-methods-for-woocommerce')
+                )
             );
         }
     }

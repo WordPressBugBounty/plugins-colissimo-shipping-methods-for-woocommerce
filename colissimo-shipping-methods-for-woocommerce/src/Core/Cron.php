@@ -67,7 +67,7 @@ class Cron {
         register_activation_hook(
             LPC_MAIN_FILE,
             function () {
-                if (!wp_next_scheduled('purge_colissimo_labels')) {
+                if (LabelPurge::getPurgeDelay() > 0 && !wp_next_scheduled('purge_colissimo_labels')) {
                     wp_schedule_event(time(), 'daily', 'purge_colissimo_labels');
                 }
             }

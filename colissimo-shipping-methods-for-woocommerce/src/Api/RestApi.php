@@ -170,6 +170,8 @@ abstract class RestApi {
             }
         } elseif (!empty($content['errorCode']) && !empty($content['errorLabel'])) {
             $message = $content['errorCode'] . ': ' . $content['errorLabel'];
+        } elseif (!empty($content['errors'][0]['errorMessage'])) {
+            $message = $content['errors'][0]['errorMessage'];
         } else {
             $message = __('Unknown error', 'colissimo-shipping-methods-for-woocommerce');
         }

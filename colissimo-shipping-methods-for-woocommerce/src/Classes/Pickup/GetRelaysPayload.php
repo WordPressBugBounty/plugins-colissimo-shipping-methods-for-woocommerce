@@ -2,6 +2,7 @@
 
 namespace Colissimo\Classes\Pickup;
 
+use Colissimo\Core\Register;
 use Colissimo\Helpers\Helper;
 use DateInterval;
 use DateTime;
@@ -26,7 +27,7 @@ class GetRelaysPayload {
             $this->payload['password']      = Helper::getPasswordWebService();
         }
 
-        $parentAccountId = Helper::get_option('lpc_parent_account');
+        $parentAccountId = Register::get('accountApi')->getParentAccountId();
         if (!empty($parentAccountId)) {
             $this->payload['codTiersPourPartenaire'] = $parentAccountId;
         }
@@ -36,14 +37,14 @@ class GetRelaysPayload {
 
     public function withAddress(array $address) {
         $this->payload['address']     = $address['address'];
-        $this->payload['zipCode']     = $address['zipCode'];
+        $this->payload['zipCode']     = preg_replace('#[^0-9a-zA-Z]#', '', $address['zipCode']);
         $this->payload['city']        = $address['city'];
         $this->payload['countryCode'] = $address['countryCode'];
 
         return $this;
     }
 
-    public function withShippingDate(DateTime $shippingDate = null) {
+    public function withShippingDate(?DateTime $shippingDate = null) {
         if (null === $shippingDate) {
             $shippingDate           = new DateTime();
             $numberOfDayPreparation = intval(Helper::get_option('lpc_preparation_time', '1'));
@@ -69,7 +70,7 @@ class GetRelaysPayload {
         return $this;
     }
 
-    public function withRelayTypeFilter(?int $weight = null) {
+    public function withRelayTypeFilter(?float $weight = null) {
         if (empty($weight)) {
             $cart = WC()->cart;
             if (!empty($cart)) {

@@ -63,6 +63,13 @@ class ShippingRates {
         }
 
         $shippingMethod = WC_Shipping_Zones::get_shipping_method(Helper::getVar('method_id'));
+        if (empty($shippingMethod)) {
+            return $this->ajaxDispatcher->makeAndLogError(
+                [
+                    'message' => 'Shipping method not found',
+                ]
+            );
+        }
 
         $lines = [
             self::SHIPPING_RATES_COLUMNS,
@@ -71,9 +78,9 @@ class ShippingRates {
         $shippingRates = $shippingMethod->get_option('shipping_rates', []);
         foreach ($shippingRates as $rate) {
             $lines[] = [
-                $rate['min_weight'],
+                $rate['min_weight'] ?? '',
                 $rate['max_weight'] ?? '',
-                $rate['min_price'],
+                $rate['min_price'] ?? '',
                 $rate['max_price'] ?? '',
                 empty($rate['shipping_class']) ? '' : implode(' ', $rate['shipping_class']),
                 empty($rate['product_category']) ? '' : implode(' ', $rate['product_category']),
@@ -213,9 +220,9 @@ class ShippingRates {
             $newLine = explode(',', $line);
             foreach ($headers as $key => $header) {
                 if (in_array($header, ['shipping_class', 'product_category'])) {
-                    $newValue = explode(' ', $newLine[$key]);
+                    $newValue = explode(' ', $newLine[$key] ?? '');
                 } else {
-                    $newValue = strlen($newLine[$key]) === 0 ? '' : (float) $newLine[$key];
+                    $newValue = strlen($newLine[$key] ?? '') === 0 ? '' : (float) $newLine[$key];
                 }
                 $rate[$header] = $newValue;
             }
@@ -223,6 +230,16 @@ class ShippingRates {
         }
 
         $shippingMethod = WC_Shipping_Zones::get_shipping_method(Helper::getVar('method_id'));
+        if (empty($shippingMethod)) {
+            die(
+            json_encode(
+                [
+                    'type'    => 'error',
+                    'message' => __('Zone not found', 'colissimo-shipping-methods-for-woocommerce'),
+                ]
+            )
+            );
+        }
         $optionName     = $shippingMethod->get_instance_option_key();
         $currentOptions = get_option($optionName, []);
 

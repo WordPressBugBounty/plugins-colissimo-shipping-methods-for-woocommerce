@@ -5,6 +5,7 @@ namespace Colissimo\Classes\Order;
 
 use Colissimo\Classes\Settings\AdminNotices;
 use Colissimo\Classes\Shipping\CapabilitiesPerCountry;
+use Colissimo\Classes\Shipping\EcoOverseas;
 use Colissimo\Classes\Shipping\NoSign;
 use Colissimo\Core\Register;
 use Colissimo\Classes\Shipping\Relay;
@@ -54,6 +55,10 @@ class TableBulkActions {
                     'ship_lpc_sign_ddp' => [
                         'id'   => SignDdp::ID,
                         'name' => __('Colissimo with signature - DDP option', 'colissimo-shipping-methods-for-woocommerce'),
+                    ],
+                    'ship_lpc_ecoom'    => [
+                        'id'   => EcoOverseas::ID,
+                        'name' => __('Colissimo ECO Overseas', 'colissimo-shipping-methods-for-woocommerce'),
                     ],
                 ];
             }

@@ -14,4 +14,8 @@ defined('ABSPATH') || die('Restricted Access');
 	   class="nav-tab <?php echo 'slip-history' === $args['tab'] ? 'nav-tab-active' : ''; ?>">
         <?php esc_html_e('Slip history', 'colissimo-shipping-methods-for-woocommerce'); ?>
 	</a>
+	<a href="<?php echo esc_url(admin_url('admin.php?page=wc_colissimo_view&tab=simulation')); ?>"
+	   class="nav-tab <?php echo 'simulation' === $args['tab'] ? 'nav-tab-active' : ''; ?>">
+        <?php esc_html_e('Cost simulation', 'colissimo-shipping-methods-for-woocommerce'); ?>
+	</a>
 </nav>

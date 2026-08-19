@@ -23,6 +23,7 @@ class LabelGenerationPayload {
     private const MAX_INSURANCE_AMOUNT = 5000;
     private const MAX_INSURANCE_AMOUNT_RELAY = 1000;
     private const FORCED_ORIGINAL_IDENT = 'A';
+    private const RETURN_TYPE_CHOICE_RETURN = 2;
     private const RETURN_TYPE_CHOICE_NO_RETURN = 3;
     private const CUSTOMS_CATEGORY_RETURN_OF_ARTICLES = 6;
     private const BELGIAN_MOBILE_NUMBER_REGEX = '/^(?:(?:\+|00)32|0)4\d{8}$/';
@@ -37,6 +38,7 @@ class LabelGenerationPayload {
     public const PRODUCT_CODE_RETURN_FRANCE = 'CORE';
     public const PRODUCT_CODE_RETURN_INT = 'CORI';
     public const PRODUCT_CODE_OM_TO_EU = 'COLI';
+    public const PRODUCT_CODE_ECO_OM = 'ECO';
 
     private const ALL_PRODUCT_CODES = [
         self::PRODUCT_CODE_WITH_SIGNATURE_OM,
@@ -49,6 +51,7 @@ class LabelGenerationPayload {
         self::PRODUCT_CODE_WITH_SIGNATURE,
         self::PRODUCT_CODE_RELAY,
         self::PRODUCT_CODE_OM_TO_EU,
+        self::PRODUCT_CODE_ECO_OM,
     ];
     private const PRODUCT_CODE_INSURANCE_AVAILABLE = [
         self::PRODUCT_CODE_WITH_SIGNATURE,
@@ -258,7 +261,7 @@ class LabelGenerationPayload {
             }
         }
 
-        $parentAccountId = Helper::get_option('lpc_parent_account');
+        $parentAccountId = $this->accountApi->getParentAccountId();
         if (!empty($parentAccountId)) {
             $this->payload['fields']['field'][] = [
                 'key'   => 'ACCOUNT_NUMBER',
@@ -474,7 +477,7 @@ class LabelGenerationPayload {
         return $this;
     }
 
-    public function withProductCode($productCode) {
+    public function withProductCode($productCode, $countryCode = null) {
         /**
          * Filter on the product code when generating a label
          *
@@ -493,8 +496,13 @@ class LabelGenerationPayload {
             throw new Exception('Unknown Product code!');
         }
 
-        $this->payload['letter']['service']['productCode']      = $productCode;
-        $this->payload['letter']['service']['returnTypeChoice'] = self::RETURN_TYPE_CHOICE_NO_RETURN;
+        $this->payload['letter']['service']['productCode'] = $productCode;
+
+        if (self::US_COUNTRY_CODE === $countryCode) {
+            $this->payload['letter']['service']['returnTypeChoice'] = self::RETURN_TYPE_CHOICE_RETURN;
+        } else {
+            $this->payload['letter']['service']['returnTypeChoice'] = self::RETURN_TYPE_CHOICE_NO_RETURN;
+        }
 
         return $this;
     }
@@ -1701,7 +1709,7 @@ class LabelGenerationPayload {
             $quantity   = $customParams['items'][$itemId]['qty'] ?? $item->get_quantity();
             $itemWeight = $customParams['items'][$itemId]['weight'] ?? $product->get_weight();
 
-            $hazardousQuantity                          = wc_get_weight($itemWeight * $quantity, 'g');
+            $hazardousQuantity                          = wc_get_weight((float) $itemWeight * $quantity, 'g');
             $hazardousMaterials[$productHazmatCategory] += $hazardousQuantity;
             $totalHazardousQuantity                     += $hazardousQuantity;
         }

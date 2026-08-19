@@ -378,7 +378,7 @@ class LabelGenerationOutward {
         $payload = new LabelGenerationPayload();
         $payload
             ->withOrderNumber($order->get_order_number())
-            ->withProductCode($productCode)
+            ->withProductCode($productCode, $order->get_shipping_country())
             ->withCredentials()
             ->withCommercialName(Helper::get_option('lpc_origin_company_name'))
             ->withCuserInfoText()

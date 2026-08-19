@@ -368,7 +368,7 @@ abstract class ShippingMethod extends WC_Shipping_Method {
         $cartShippingClasses   = [];
         $cartProductCategories = [];
         $cartHazmatCategories  = [];
-        $yithBundlesHandled    = [];
+        $bundlesHandled        = [];
 
         foreach ($cartContents as $item) {
             if (empty($item['data'])) {
@@ -379,9 +379,15 @@ abstract class ShippingMethod extends WC_Shipping_Method {
             $quantity        = (float) $item['quantity'];
             $articleQuantity += $quantity;
 
+            $isWcBundleChild = false;
             if (!empty($item['bundled_by'])) {
-                $yithBundlesHandled[] = $item['bundled_by'];
-                continue;
+                $bundlesHandled[] = $item['bundled_by'];
+                $isWcBundleChild  = $this->isWcProductBundlesChild($item);
+
+                // YITH Bundles take care of their included products in the container item
+                if (!$isWcBundleChild) {
+                    continue;
+                }
             }
 
             $itemData = $this->extractItemData($item);
@@ -390,7 +396,8 @@ abstract class ShippingMethod extends WC_Shipping_Method {
             }
 
             if (!$itemData['isShippable']) {
-                if ($noshipProductsCount) {
+                // WooCommerce Product Bundles children carry the real price even when the bundle is shipped assembled (children flagged as virtual)
+                if ($noshipProductsCount || $isWcBundleChild) {
                     $lineTotal    += $itemData['line_total'];
                     $lineTax      += $itemData['line_tax'];
                     $lineSubTotal += $itemData['line_subtotal'];
@@ -422,8 +429,8 @@ abstract class ShippingMethod extends WC_Shipping_Method {
             }
         }
 
-        // Don't count the Yith bundle entry as an article
-        $articleQuantity -= count(array_unique($yithBundlesHandled));
+        // Don't count the bundle container entry as an article
+        $articleQuantity -= count(array_unique($bundlesHandled));
 
         $cartShippingClasses = array_unique($cartShippingClasses);
 
@@ -454,8 +461,8 @@ abstract class ShippingMethod extends WC_Shipping_Method {
     }
 
     private function extractItemData(array $item): ?array {
-        // YITH Bundles take care of their included products
-        if (!empty($item['bundled_by'])) {
+        // YITH Bundles take care of their included products, WooCommerce Product Bundles children carry their own price and weight
+        if (!empty($item['bundled_by']) && !$this->isWcProductBundlesChild($item)) {
             return null;
         }
 
@@ -474,6 +481,16 @@ abstract class ShippingMethod extends WC_Shipping_Method {
                 : $product->get_category_ids('edit'),
             'isShippable'       => !is_callable([$product, 'needs_shipping']) || $product->needs_shipping(),
         ];
+    }
+
+    private function isWcProductBundlesChild(array $item): bool {
+        if (empty($item['bundled_by']) || empty($item['bundled_item_id']) || !function_exists('wc_pb_get_bundled_cart_item_container')) {
+            return false;
+        }
+
+        $container = wc_pb_get_bundled_cart_item_container($item);
+
+        return !empty($container['data']) && is_a($container['data'], 'WC_Product') && 'bundle' === $container['data']->get_type();
     }
 
     private function isShippingAllowedForCart(array $cart, array $package): bool {
@@ -552,8 +569,8 @@ abstract class ShippingMethod extends WC_Shipping_Method {
                 }
             }
 
-            $weightMatches = $totalWeight >= $oneRate['min_weight'] && (empty($oneRate['max_weight']) || $totalWeight < $oneRate['max_weight']);
-            $priceMatches  = $cart['totalPrice'] >= $oneRate['min_price'] && (empty($oneRate['max_price']) || $cart['totalPrice'] < $oneRate['max_price']);
+            $weightMatches = $totalWeight >= ($oneRate['min_weight'] ?? 0) && (empty($oneRate['max_weight']) || $totalWeight < $oneRate['max_weight']);
+            $priceMatches  = $cart['totalPrice'] >= ($oneRate['min_price'] ?? 0) && (empty($oneRate['max_price']) || $cart['totalPrice'] < $oneRate['max_price']);
 
             if (!$weightMatches || !$priceMatches) {
                 continue;

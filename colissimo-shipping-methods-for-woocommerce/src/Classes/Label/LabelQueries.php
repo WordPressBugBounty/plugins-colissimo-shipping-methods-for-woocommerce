@@ -4,19 +4,8 @@ namespace Colissimo\Classes\Label;
 
 use Colissimo\Classes\Shipping\ShippingMethod;
 use Colissimo\Helpers\Helper;
-use Colissimo\Classes\Label\InwardLabelDb;
 use Colissimo\Classes\Email\InwardLabelEmailManager;
-use Colissimo\Classes\Label\LabelGenerationPayload;
-use Colissimo\Classes\Label\InwardDeleteAction;
-use Colissimo\Classes\Label\InwardDownloadAction;
-use Colissimo\Classes\Label\InwardGenerateAction;
-use Colissimo\Classes\Label\OutwardDeleteAction;
-use Colissimo\Classes\Label\OutwardDownloadAction;
-use Colissimo\Classes\Label\OutwardGenerateAction;
-use Colissimo\Classes\Label\PackagerDownloadAction;
-use Colissimo\Classes\Label\LabelPrintAction;
 use Colissimo\Core\Register;
-use Colissimo\Classes\Label\OutwardLabelDb;
 
 defined('ABSPATH') || die('Restricted Access');
 
@@ -331,17 +320,25 @@ class LabelQueries {
     public static function enqueueLabelsActionsScript() {
         $thermalLabelPrintAction              = Register::get('thermalLabelPrintAction');
         $args['errorMsgPrintThermal']         = __('Print thermal error on some orders:', 'colissimo-shipping-methods-for-woocommerce');
-        $args['deletionConfirmTextOutward']   = __('Do you confirm the deletion of label? All related inwards label will be deleted too', 'colissimo-shipping-methods-for-woocommerce');
+        $args['deletionConfirmTextOutward']   = __('Do you confirm the deletion of label? All related inwards label will be deleted too',
+                                                   'colissimo-shipping-methods-for-woocommerce');
         $args['deletionConfirmTextInward']    = __('Do you confirm the deletion of label?', 'colissimo-shipping-methods-for-woocommerce');
         $args['thermalLabelPrintActionUrl']   = $thermalLabelPrintAction->getThermalPrintActionUrl();
         $args['generateConfirmTextOutward']   = __('Do you confirm the creation of outward label?', 'colissimo-shipping-methods-for-woocommerce');
         $args['generateConfirmTextInward']    = __('Do you confirm the creation of inward label?', 'colissimo-shipping-methods-for-woocommerce');
         $args['deletionConfirmTextBordereau'] = __('Do you confirm the deletion of bordereau?', 'colissimo-shipping-methods-for-woocommerce');
+        $args['qzPrinter']                    = Helper::get_option('lpc_zpldpl_labels_printer', '');
+
+        Helper::enqueueScript(
+            'lpc_qz_tray',
+            Helper::getJsUrl('libraries/qz-tray.js'),
+            []
+        );
 
         Helper::enqueueScript(
             'lpc_labels_actions',
             Helper::getJsUrl('labels/actions.js'),
-            ['jquery-core'],
+            ['jquery-core', 'lpc_qz_tray'],
             'lpcLabelsActions',
             $args
         );

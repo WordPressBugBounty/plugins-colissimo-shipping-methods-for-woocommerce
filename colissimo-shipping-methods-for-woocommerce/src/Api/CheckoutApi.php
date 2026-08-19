@@ -2,6 +2,7 @@
 
 namespace Colissimo\Api;
 
+use Colissimo\Core\Register;
 use Colissimo\Helpers\Logger;
 use Colissimo\Helpers\Helper;
 use DateTime;
@@ -16,7 +17,7 @@ class CheckoutApi extends RestApi {
         return self::API_BASE_URL . $action;
     }
 
-    public function getDeliveryDate(string $postCode): ?string {
+    public function getDeliveryDate(string $postCode, ?int $baseTimestamp = null, bool $dateOnly = false): ?string {
         if ('api_key' === Helper::get_option('lpc_credentials_type', 'api_key')) {
             $payload['credentials']['apiKey'] = Helper::get_option('lpc_apikey');
         } else {
@@ -24,14 +25,14 @@ class CheckoutApi extends RestApi {
             $payload['credentials']['password'] = Helper::getPasswordWebService();
         }
 
-        $parentAccountId = Helper::get_option('lpc_parent_account');
+        $parentAccountId = Register::get('accountApi')->getParentAccountId();
         if (!empty($parentAccountId)) {
             $payload['credentials']['partnerClientCode'] = $parentAccountId;
         }
 
         $payload['data']['zipCodeDest']  = $postCode;
         $payload['data']['regateDepart'] = Helper::get_option('lpc_delivery_date_deposit_location');
-        $payload['data']['depositDate']  = $this->getDepositDate();
+        $payload['data']['depositDate']  = $this->getDepositDate($baseTimestamp);
 
         if (empty($payload['data']['depositDate'])) {
             return null;
@@ -71,10 +72,10 @@ class CheckoutApi extends RestApi {
             ]
         );
 
-        return !empty($response['deliveryDate']) ? $this->formatDeliveryDate($response['deliveryDate']) : null;
+        return !empty($response['deliveryDate']) ? $this->formatDeliveryDate($response['deliveryDate'], $dateOnly) : null;
     }
 
-    private function getDepositDate(): ?string {
+    private function getDepositDate(?int $baseTimestamp = null): ?string {
         $cuttOffDates = Helper::get_option('lpc_delivery_date_cuttoff_times');
         if (empty($cuttOffDates)) {
             return null;
@@ -86,7 +87,7 @@ class CheckoutApi extends RestApi {
         }
 
         $nbTries     = 0;
-        $time        = time();
+        $time        = $baseTimestamp ?? time();
         $currentTime = (int) wp_date('H', $time);
 
         // Find the processing day
@@ -143,15 +144,10 @@ class CheckoutApi extends RestApi {
         return null;
     }
 
-    private function formatDeliveryDate(string $deliveryDate): ?string {
+    private function formatDeliveryDate(string $deliveryDate, bool $dateOnly = false): ?string {
         $dateTime = DateTime::createFromFormat('d/m/Y', $deliveryDate);
         if (!$dateTime) {
             return null;
-        }
-
-        $text = Helper::get_option('lpc_delivery_date_text');
-        if (empty($text) || strpos($text, '{date}') === false) {
-            $text = __('Delivery expected on {date}', 'colissimo-shipping-methods-for-woocommerce');
         }
 
         $format = Helper::get_option('lpc_delivery_date_format');
@@ -174,6 +170,16 @@ class CheckoutApi extends RestApi {
 
         $timestamp = $dateTime->getTimestamp();
         $date      = Helper::translateDate(gmdate($dateFormat, $timestamp));
+
+        // Return only the raw formatted date, without the surrounding text and styling
+        if ($dateOnly) {
+            return $date;
+        }
+
+        $text = Helper::get_option('lpc_delivery_date_text');
+        if (empty($text) || strpos($text, '{date}') === false) {
+            $text = __('Delivery expected on {date}', 'colissimo-shipping-methods-for-woocommerce');
+        }
 
         $styles    = '';
         $textColor = Helper::get_option('lpc_delivery_date_color');

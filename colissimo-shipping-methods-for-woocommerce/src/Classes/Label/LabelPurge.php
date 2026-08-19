@@ -10,6 +10,8 @@ use Colissimo\Helpers\Helper;
 defined('ABSPATH') || die('Restricted Access');
 
 class LabelPurge {
+    const DEFAULT_PURGE_DELAY = 30;
+
     /** @var InwardLabelDb */
     protected $inwardLabelDb;
     /** @var OutwardLabelDb */
@@ -27,9 +29,21 @@ class LabelPurge {
         $this->bordereauDb = Register::get('bordereauDb');
     }
 
+    public static function getPurgeDelay(): int {
+        $nbDays = Helper::get_option('lpc_day_purge', self::DEFAULT_PURGE_DELAY);
+
+        if (!is_numeric($nbDays)) {
+            return 0;
+        }
+
+        return max(0, (int) $nbDays);
+    }
+
     public function purgeReadyLabels() {
-        $nbDays = (int) Helper::get_option('lpc_day_purge', 30);
+        $nbDays = self::getPurgeDelay();
         if (empty($nbDays)) {
+            Logger::debug(__METHOD__ . ' purge disabled, nothing to do');
+
             return;
         }
 

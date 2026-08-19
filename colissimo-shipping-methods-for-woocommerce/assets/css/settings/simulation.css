@@ -1,0 +1,80 @@
+.lpc-simulation .lpc-simulation-columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.lpc-simulation .lpc-simulation-column {
+    flex: 1 1 280px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    padding: 1rem 1.25rem;
+    box-sizing: border-box;
+}
+
+.lpc-simulation .lpc-simulation-section {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.lpc-simulation label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.lpc-simulation input[type="text"],
+.lpc-simulation input[type="number"],
+.lpc-simulation select {
+    min-width: 240px;
+    max-width: 100%;
+}
+
+/* Same width for all the fields of a column, whatever their content */
+.lpc-simulation .lpc-simulation-column input[type="text"],
+.lpc-simulation .lpc-simulation-column input[type="number"],
+.lpc-simulation .lpc-simulation-column select {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.lpc-simulation .lpc-field-error {
+    border: 1px solid #d63638;
+    box-shadow: 0 0 0 1px #d63638;
+}
+
+.lpc-simulation .lpc-option-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.lpc-simulation-result {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    padding: 1rem 1.25rem;
+    max-width: 640px;
+}
+
+.lpc-simulation-result table {
+    margin-top: 0.5rem;
+}
+
+.lpc-simulation-result .lpc-simulation-detail th,
+.lpc-simulation-result .lpc-simulation-detail td {
+    font-weight: 400;
+    color: #646970;
+    padding-left: 1.5rem;
+}
+
+.lpc-simulation-result .lpc-simulation-total th,
+.lpc-simulation-result .lpc-simulation-total td {
+    font-weight: 700;
+    border-top: 2px solid #c3c4c7;
+    font-size: 1.05em;
+}

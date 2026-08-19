@@ -54,43 +54,46 @@ class ThermalLabelPrintAction {
             );
         }
 
-        $urls = [];
+        $labels = [];
 
         $thermalLabelsInfos = Helper::getVar(self::THERMAL_LABEL_INFOS_VAR_NAME, [], 'array');
 
         foreach ($thermalLabelsInfos as $oneThermalInfo) {
-            $trackingNumber = $oneThermalInfo[self::TRACKING_NUMBER_VAR_NAME];
+            $trackingNumber = $oneThermalInfo[self::TRACKING_NUMBER_VAR_NAME] ?? '';
 
             if (empty($trackingNumber)) {
                 Logger::error(
                     __METHOD__ . ' tracking number missing'
                 );
 
-                return json_encode($urls);
+                return json_encode($labels);
             }
 
             $isOutward = true;
             $label     = $this->getLabel($trackingNumber, $isOutward);
 
-            if (!in_array($label['format'], [LabelGenerationPayload::LABEL_FORMAT_DPL, LabelGenerationPayload::LABEL_FORMAT_ZPL])) {
+            if (false === $label || !in_array($label['format'], [LabelGenerationPayload::LABEL_FORMAT_DPL, LabelGenerationPayload::LABEL_FORMAT_ZPL])) {
                 continue;
             }
 
-            $url = $this->generateUrl($label);
-
-            if ($url['success']) {
-                $urls[] = [
-                    'trackingNumber' => $trackingNumber,
-                    'url'            => $url['info'],
-                ];
-            } elseif (!empty($url['info'])) {
+            // Legacy print kit URL, kept as a fallback for merchants who haven't set up QZ Tray yet
+            $legacyUrl = $this->generateUrl($label);
+            if (!$legacyUrl['success'] && !empty($legacyUrl['info'])) {
                 Logger::error(
-                    __METHOD__ . ' ' . $url['info'],
+                    __METHOD__ . ' ' . $legacyUrl['info'],
                     [
                         'tracking_number' => $trackingNumber,
                     ]
                 );
             }
+
+            $labels[] = [
+                'trackingNumber' => $trackingNumber,
+                'format'         => $label['format'],
+                // Raw ZPL/DPL bytes, base64-encoded, sent as-is to the printer through QZ Tray
+                'label'          => base64_encode($label['label']),
+                'legacyUrl'      => $legacyUrl['success'] ? $legacyUrl['info'] : '',
+            ];
 
             if ($isOutward) {
                 $this->outwardLabelDb->updatePrintedLabel($trackingNumber);
@@ -99,7 +102,7 @@ class ThermalLabelPrintAction {
             }
         }
 
-        return json_encode($urls);
+        return json_encode($labels);
     }
 
     protected function generateUrl($label = []) {
