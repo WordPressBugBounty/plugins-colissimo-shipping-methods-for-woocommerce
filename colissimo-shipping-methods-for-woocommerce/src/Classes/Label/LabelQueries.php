@@ -336,9 +336,17 @@ class LabelQueries {
         );
 
         Helper::enqueueScript(
+            'lpc_qz_setup',
+            Helper::getJsUrl('qz/setup.js'),
+            ['jquery-core', 'lpc_qz_tray'],
+            'lpcQzSigning',
+            Register::get('qzTraySigning')->getScriptArgs()
+        );
+
+        Helper::enqueueScript(
             'lpc_labels_actions',
             Helper::getJsUrl('labels/actions.js'),
-            ['jquery-core', 'lpc_qz_tray'],
+            ['jquery-core', 'lpc_qz_tray', 'lpc_qz_setup'],
             'lpcLabelsActions',
             $args
         );

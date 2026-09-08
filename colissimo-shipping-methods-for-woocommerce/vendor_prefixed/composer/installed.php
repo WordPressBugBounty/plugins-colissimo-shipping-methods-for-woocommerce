@@ -4,7 +4,7 @@
     'name' => 'laposte/colissimo-shipping-methods-for-woocommerce',
     'pretty_version' => 'dev-develop',
     'version' => 'dev-develop',
-    'reference' => '3c1fe4d7e96b33f1e6797988a37d4dff1f6684de',
+    'reference' => '6a7e6bd8c8d1fadcf965a51b9cf6148a01d1a8da',
     'type' => 'wordpress-plugin',
     'install_path' => __DIR__ . '/../',
     'aliases' => 

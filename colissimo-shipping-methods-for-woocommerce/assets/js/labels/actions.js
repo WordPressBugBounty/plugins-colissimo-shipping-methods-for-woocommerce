@@ -112,23 +112,21 @@ jQuery(function ($) {
     // Print the thermal labels through QZ Tray, falling back to the legacy print kit URLs
     // when QZ Tray is not installed/running (e.g. merchant updated but hasn't set it up yet).
     function printThermalLabels(labels) {
-        if ('undefined' === typeof qz || !qz.websocket) {
+        if ('undefined' === typeof lpcQz || !lpcQz.isAvailable()) {
             printThermalLegacy(labels);
             return;
         }
 
-        setupQzTray();
-
-        connectQzTray().then(function () {
+        lpcQz.connect().then(function () {
             getQzConfig()
                 .then(function (config) {
                     return printRawSequentially(config, labels);
                 })
                 .then(function () {
-                    disconnectQzTray();
+                    lpcQz.disconnect();
                 })
                 .catch(function (error) {
-                    disconnectQzTray();
+                    lpcQz.disconnect();
                     console.error(error);
                     if ($('#lpc_thermal_print_error_message').length === 0) {
                         displayErrors(lpcLabelsActions.errorMsgPrintThermal + ' ' + error);
@@ -139,38 +137,6 @@ jQuery(function ($) {
             console.warn('QZ Tray unavailable, falling back to the legacy print kit', connectError);
             printThermalLegacy(labels);
         });
-    }
-
-    let qzTrayReady = false;
-
-    function setupQzTray() {
-        if (qzTrayReady) {
-            return;
-        }
-
-        qz.api.setPromiseType(function (resolver) {
-            return new Promise(resolver);
-        });
-
-        // QZ Tray runs unsigned here: it prompts the operator to allow printing the first time
-        // (they can tick "remember"). Signed mode can be wired later through qz.security.* if a
-        // certificate is provided.
-
-        qzTrayReady = true;
-    }
-
-    function connectQzTray() {
-        if (qz.websocket.isActive()) {
-            return Promise.resolve();
-        }
-
-        return qz.websocket.connect();
-    }
-
-    function disconnectQzTray() {
-        if (qz.websocket.isActive()) {
-            qz.websocket.disconnect();
-        }
     }
 
     function getQzConfig() {

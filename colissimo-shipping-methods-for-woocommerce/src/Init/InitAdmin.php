@@ -13,6 +13,7 @@ use Colissimo\Classes\Label\OutwardDownloadAction;
 use Colissimo\Classes\Label\OutwardDeleteAction;
 use Colissimo\Classes\Label\OutwardGenerateAction;
 use Colissimo\Classes\Label\OutwardImportAction;
+use Colissimo\Classes\Label\QzTraySigning;
 use Colissimo\Classes\Label\ThermalLabelPrintAction;
 use Colissimo\Classes\Order\Banner;
 use Colissimo\Classes\Order\AffectMethod;
@@ -72,6 +73,7 @@ class InitAdmin {
         Register::register('labelOutwardDownloadAction', new OutwardDownloadAction());
         Register::register('labelPrintAction', new LabelPrintAction());
         Register::register('thermalLabelPrintAction', new ThermalLabelPrintAction());
+        Register::register('qzTraySigning', new QzTraySigning());
         Register::register('bordereauDownloadAction', new SlipDownloadAction());
         Register::register('bordereauDeleteAction', new SlipDeleteAction());
         Register::register('bordereauPrintAction', new SlipPrintAction());

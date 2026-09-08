@@ -10,3 +10,12 @@
 	font-weight: bold;
 	font-size: 1rem;
 }
+
+.lpc_qz_guide{
+	list-style: decimal outside;
+	margin-left: 20px;
+}
+
+.forminp-lpc_qz_file input[type="file"]{
+	max-width: 400px;
+}

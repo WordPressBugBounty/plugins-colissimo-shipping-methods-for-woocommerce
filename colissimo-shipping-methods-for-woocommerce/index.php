@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Colissimo shipping methods for WooCommerce
  * Description: This extension gives you the possibility to use the Colissimo shipping methods in WooCommerce
- * Version: 3.1.0
+ * Version: 3.1.1
  * Author: Colissimo
  * Author URI: https://www.colissimo.entreprise.laposte.fr/fr
  *

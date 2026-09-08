@@ -2,8 +2,8 @@
 Contributors: iscpcolissimo
 Tags: shipping, colissimo, woocommerce
 Requires at least: 6.2
-Tested up to: 7.0
-Stable tag: 3.1.0
+Tested up to: 7.1
+Stable tag: 3.1.1
 Requires PHP: 7.4
 License: GPLv3
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -57,6 +57,13 @@ The recipient can follow the journey of their parcel on their customer area and 
 
 
 == Changelog ==
+
+= 3.1.1 =
+
+AMÉLIORATIONS
+
+- La nouvelle intégration avec QZ Tray a été améliorée afin de ne plus nécessiter de valider chaque impression
+
 
 = 3.1.0 =
 

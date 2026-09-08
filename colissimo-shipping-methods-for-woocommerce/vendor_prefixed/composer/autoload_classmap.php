@@ -52,6 +52,7 @@ return array(
     'Colissimo\\Classes\\Label\\OutwardImportAction' => $baseDir . '/src/Classes/Label/OutwardImportAction.php',
     'Colissimo\\Classes\\Label\\OutwardLabelDb' => $baseDir . '/src/Classes/Label/OutwardLabelDb.php',
     'Colissimo\\Classes\\Label\\PackagerDownloadAction' => $baseDir . '/src/Classes/Label/PackagerDownloadAction.php',
+    'Colissimo\\Classes\\Label\\QzTraySigning' => $baseDir . '/src/Classes/Label/QzTraySigning.php',
     'Colissimo\\Classes\\Label\\ThermalLabelPrintAction' => $baseDir . '/src/Classes/Label/ThermalLabelPrintAction.php',
     'Colissimo\\Classes\\Label\\TrackingPage' => $baseDir . '/src/Classes/Label/TrackingPage.php',
     'Colissimo\\Classes\\Label\\UpdateStatusesAction' => $baseDir . '/src/Classes/Label/UpdateStatusesAction.php',

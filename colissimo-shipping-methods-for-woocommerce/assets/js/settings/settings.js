@@ -3,6 +3,8 @@ jQuery(function ($) {
         changeCredentialsType();
         securedReturn();
         thermalPrint();
+        qzTrayCertificate();
+        qzTrayFiles();
         extraCost();
         relays();
         shippingDate();
@@ -60,6 +62,95 @@ jQuery(function ($) {
         $securedReturn.on('change', toggleReturnOptions);
     }
 
+    function qzTrayCertificate() {
+        const $generate = $('#lpc_qz_generate_button');
+        if (!$generate.length) {
+            return;
+        }
+
+        const $download = $('#lpc_qz_download_button');
+        const $status = $('#lpc_qz_certificate_status');
+        const $importRows = $('#lpc_qz_certificate, #lpc_qz_private_key').closest('tr');
+        let certificate = 'undefined' === typeof lpcQzSigning ? '' : lpcQzSigning.certificate;
+
+        // The manual import stays available for merchants using their own QZ Tray licence
+        $importRows.hide();
+        $('#lpc_qz_import_toggle').on('click', function (event) {
+            event.preventDefault();
+            $importRows.show();
+            $(this).closest('p').hide();
+        });
+
+        $generate.on('click', function () {
+            if (certificate && !window.confirm(lpcThermalSettings.regenerateConfirm)) {
+                return;
+            }
+
+            $generate.prop('disabled', true);
+            $status.text(lpcThermalSettings.generating);
+
+            $.ajax({
+                type: 'POST',
+                url: $generate.data('url'),
+                dataType: 'json'
+            }).done(function (response) {
+                if (response && 'success' === response.type && response.certificate) {
+                    certificate = response.certificate;
+                    $status.text(response.info);
+                    $download.prop('disabled', false);
+                    $generate.text(lpcThermalSettings.regenerate);
+                } else {
+                    $status.text(response && response.message ? response.message : lpcThermalSettings.generateError);
+                }
+
+                $generate.prop('disabled', false);
+            }).fail(function () {
+                $status.text(lpcThermalSettings.generateError);
+                $generate.prop('disabled', false);
+            });
+        });
+
+        $download.on('click', function () {
+            if (!certificate) {
+                return;
+            }
+
+            const url = URL.createObjectURL(new Blob([certificate], {type: 'application/x-x509-ca-cert'}));
+            const $link = $('<a></a>').attr('href', url).attr('download', 'certificate.crt');
+            $('body').append($link);
+            $link[0].click();
+            $link.remove();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    function qzTrayFiles() {
+        $('.lpc_qz_file').on('change', function () {
+            const $field = $('#' + $(this).data('target'));
+            const $status = $('#' + $(this).data('target') + '_status');
+            const file = this.files && this.files[0];
+
+            if (!file) {
+                $field.val('');
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = function (event) {
+                $field.val(event.target.result);
+                $status.text(lpcThermalSettings.fileSelected.replace('%s', file.name));
+            };
+
+            reader.onerror = function () {
+                $field.val('');
+                $status.text(lpcThermalSettings.fileError);
+            };
+
+            reader.readAsText(file);
+        });
+    }
+
     function thermalPrint() {
         const $printerField = $('#lpc_zpldpl_labels_printer');
         if (!$printerField.length) {
@@ -79,47 +170,61 @@ jQuery(function ($) {
             }
         });
 
-        if ('undefined' === typeof qz || !qz.websocket) {
+        if ('undefined' === typeof lpcQz || !lpcQz.isAvailable()) {
             $select.hide();
             $status.text(lpcThermalSettings.unavailable);
             return;
         }
 
-        $status.text(lpcThermalSettings.detecting);
-        $select.append($('<option></option>').val('').text(lpcThermalSettings.select));
+        const $detect = $('<button type="button" class="button" style="display:block;margin-bottom:6px;"></button>')
+            .text(lpcThermalSettings.detect);
+        $select.before($detect);
 
-        qz.api.setPromiseType(function (resolver) {
-            return new Promise(resolver);
-        });
+        const detectPrinters = function () {
+            $detect.prop('disabled', true);
+            $select.empty().show();
+            $status.text(lpcThermalSettings.detecting);
+            $select.append($('<option></option>').val('').text(lpcThermalSettings.select));
 
-        const finish = function () {
-            if (qz.websocket.isActive()) {
-                qz.websocket.disconnect();
-            }
+            const finish = function () {
+                $detect.prop('disabled', false);
+                lpcQz.disconnect();
+            };
+
+            lpcQz.connect().then(function () {
+                return qz.printers.find();
+            }).then(function (printers) {
+                const list = Array.isArray(printers) ? printers : [printers];
+                const current = $printerField.val();
+
+                list.forEach(function (printer) {
+                    const $option = $('<option></option>').val(printer).text(printer);
+                    if (printer === current) {
+                        $option.prop('selected', true);
+                    }
+                    $select.append($option);
+                });
+
+                $status.text('');
+                finish();
+            }).catch(function (error) {
+                console.warn('QZ Tray printer detection failed', error);
+                $select.hide();
+                $status.text(lpcThermalSettings.unavailable);
+                finish();
+            });
         };
 
-        qz.websocket.connect().then(function () {
-            return qz.printers.find();
-        }).then(function (printers) {
-            const list = Array.isArray(printers) ? printers : [printers];
-            const current = $printerField.val();
+        $detect.on('click', detectPrinters);
 
-            list.forEach(function (printer) {
-                const $option = $('<option></option>').val(printer).text(printer);
-                if (printer === current) {
-                    $option.prop('selected', true);
-                }
-                $select.append($option);
-            });
-
-            $status.text('');
-            finish();
-        }).catch(function (error) {
-            console.warn('QZ Tray printer detection failed', error);
+        // Without signing, connecting makes QZ Tray prompt the operator: only do it on demand
+        // once a printer has been chosen.
+        if (lpcQz.isSigned() || !$printerField.val()) {
+            detectPrinters();
+        } else {
             $select.hide();
-            $status.text(lpcThermalSettings.unavailable);
-            finish();
-        });
+            $status.text(lpcThermalSettings.detectHint);
+        }
     }
 
     function extraCost() {

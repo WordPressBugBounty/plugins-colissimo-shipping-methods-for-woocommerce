@@ -33,7 +33,9 @@ $allowedTags = [
                 ?>
 			</li>
 			<li><?php esc_html_e('Launch QZ Tray on the computer connected to the thermal printer, and keep it running.', 'colissimo-shipping-methods-for-woocommerce'); ?></li>
-			<li><?php esc_html_e('Reload this settings page: with an up-to-date QZ Tray, the connection is usually trusted automatically and your printers appear below.', 'colissimo-shipping-methods-for-woocommerce'); ?></li>
+			<li><?php esc_html_e('Below, click "Generate the certificate" then "Download certificate".', 'colissimo-shipping-methods-for-woocommerce'); ?></li>
+			<li><?php esc_html_e('Click the QZ Tray icon on your computer then Advanced, Site Manager, click the "+" icon then Browse and select the certificate you just downloaded.', 'colissimo-shipping-methods-for-woocommerce'); ?></li>
+			<li><?php esc_html_e('Reload this settings page: your printers appear below and printing no longer shows any popup.', 'colissimo-shipping-methods-for-woocommerce'); ?></li>
 			<li>
                 <?php
                 // translators: %s is a link to the local QZ Tray address.
