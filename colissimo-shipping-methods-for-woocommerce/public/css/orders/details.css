@@ -1,8 +1,0 @@
-#lpc_return_products{
-	margin-top: 1rem;
-	margin-bottom: 1rem;
-}
-
-#lpc_return_products + p.order-again{
-	display: inline-block;
-}
