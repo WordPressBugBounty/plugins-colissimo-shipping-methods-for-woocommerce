@@ -231,6 +231,64 @@ defined('ABSPATH') || die('Restricted Access');
 		</pre>
 	</div>
 	<div>
+		<h3>lpc_payload</h3>
+		<p>src/Classes/Label/LabelGenerationPayload.php</p>
+		<p>This filter allows you to modify the whole payload sent when generating a label, once every other filter has been applied.
+			Use it for the values that have no dedicated filter. The structure of the payload is described
+			<a target="_blank" href="https://www.applications.colissimo.entreprise.laposte.fr/doc-colissimo/redoc-sls/fr#tag/Description-et-exemples-des-methodes-du-WS-SLS">here</a>.</p>
+		<p>Example:</p>
+		<pre>
+	add_filter('lpc_payload', function($payload, $orderNumber, $isReturnLabel){
+		$payload['letter']['customsDeclarations']['importerAddress'] = [
+			'companyName' => 'My company',
+			'line2'       => '1 rue de la Paix',
+			'countryCode' => 'FR',
+			'city'        => 'Paris',
+			'zipCode'     => '75001',
+		];
+		return $payload;
+	}, 10, 3);
+		</pre>
+	</div>
+	<div>
+		<h3>lpc_payload_fields</h3>
+		<p>src/Classes/Label/LabelGenerationPayload.php</p>
+		<p>This filter allows you to modify the custom fields (key/value pairs) sent when generating a label.
+			The plugin already handles ACCOUNT_NUMBER, LENGTH, WIDTH, HEIGHT, CUSER_INFO_TEXT, CUSER_INFO_TEXT_3,
+			OUTPUT_PRINT_TYPE_CN23, EORI, TYPE_MULTI_PARCEL, PARCEL_ITERATION_NUMBER, TOTAL_NUMBER_PARCEL and LIST_FOLLOWER_PARCEL.
+			The complete list of the available fields is described
+			<a target="_blank" href="https://www.applications.colissimo.entreprise.laposte.fr/doc-colissimo/redoc-sls/fr#tag/Description-et-exemples-des-methodes-du-WS-SLS">here</a>.</p>
+		<p>Example, adding the fields the plugin does not send: the addressee EORI number, a custom barcode,
+			the transaction identifier of a deferred payment and a partner reference.</p>
+		<pre>
+	add_filter('lpc_payload_fields', function($fields, $orderNumber, $isReturnLabel){
+		$fields[] = [
+			'key'   => 'EORI_ADDRESSEE',
+			'value' => 'GB123456789',
+		];
+		$fields[] = [
+			'key'   => 'PRINT_CUSTOMER_BARCODE',
+			'value' => '1',
+		];
+		$fields[] = [
+			'key'   => 'CUSTOMER_BARCODE',
+			'value' => 'REF12345678',
+		];
+		$fields[] = [
+			'key'   => 'BNPL',
+			'value' => 'My transaction ID',
+		];
+		$fields[] = [
+			'key'   => 'CUSER_INFO_TEXT_4',
+			'value' => 'My partner reference',
+		];
+		return $fields;
+	}, 10, 3);
+		</pre>
+		<p>A custom text of 15 characters maximum can be printed below the label instead of a custom barcode,
+			with the fields PRINT_CUSTOMER_LABEL and CUSTOMER_LABEL. A label cannot show both.</p>
+	</div>
+	<div>
 		<h3>lpc_pdf_label</h3>
 		<p>src/Classes/Label/OutwardDownloadAction.php</p>
 		<p>This filter allows you to modify the PDF content when downloading a label from the Colissimo listing.

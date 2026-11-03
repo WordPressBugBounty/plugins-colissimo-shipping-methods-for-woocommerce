@@ -116,6 +116,17 @@ abstract class ShippingMethod extends WC_Shipping_Method {
             'shipping_rates'                               => [
                 'type' => 'shipping_rates',
             ],
+            'exclude_noship_products_from_discount'        => [
+                'title'       => __('Exclude the products without shipment from the discounts', 'colissimo-shipping-methods-for-woocommerce'),
+                'type'        => 'checkbox',
+                'description' => __(
+                    'If enabled, only the shipped products are counted to reach the number of products of the discounts below.',
+                    'colissimo-shipping-methods-for-woocommerce'
+                ),
+                'default'     => $this->get_option('exclude_noship_products_from_discount', 'no'),
+                'desc_tip'    => true,
+                'label'       => ' ',
+            ],
             'shipping_discount'                            => [
                 'type' => 'shipping_discount',
             ],
@@ -674,9 +685,12 @@ abstract class ShippingMethod extends WC_Shipping_Method {
 
     private function applyDiscount(float $cost, array $cart): float {
         $discountToApply = 0.0;
+        $nbProducts      = 'yes' === $this->get_option('exclude_noship_products_from_discount', 'no')
+            ? $cart['nbProductsToShip']
+            : $cart['articleQuantity'];
 
         foreach ($this->getDiscounts() as $discount) {
-            if ($discount['nb_product'] <= $cart['articleQuantity'] && $discountToApply < $discount['percentage']) {
+            if ($discount['nb_product'] <= $nbProducts && $discountToApply < $discount['percentage']) {
                 $discountToApply = (float) $discount['percentage'];
             }
         }

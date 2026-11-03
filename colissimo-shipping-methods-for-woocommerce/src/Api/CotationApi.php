@@ -2,6 +2,7 @@
 
 namespace Colissimo\Api;
 
+use Colissimo\Core\Register;
 use Colissimo\Helpers\Logger;
 use Colissimo\Helpers\Helper;
 
@@ -55,6 +56,11 @@ class CotationApi extends RestApi {
                 'login: ' . Helper::get_option('lpc_id_webservices'),
                 'password: ' . Helper::getPasswordWebService(),
             ];
+        }
+
+        $parentAccountId = Register::get('accountApi')->getParentAccountId();
+        if (!empty($parentAccountId)) {
+            $credentials[] = 'partnerClientCode: ' . $parentAccountId;
         }
 
         try {

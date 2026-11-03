@@ -121,7 +121,7 @@ class OutwardDeleteAction {
                 'outward_label_delete',
                 'notice-error',
                 sprintf(
-                    // translators: %s is the tracking number of the label.
+                // translators: %s is the tracking number of the label.
                     __('Unable to delete label %s', 'colissimo-shipping-methods-for-woocommerce'),
                     $trackingNumber
                 )
@@ -136,8 +136,10 @@ class OutwardDeleteAction {
                     $order->save();
                 }
 
-                // Remove the related order meta
-                $order->update_meta_data(LabelGenerationOutward::OUTWARD_PARCEL_NUMBER_META_KEY, '');
+                // Remove the related order meta if same as currently deleting tracking number
+                if ($trackingNumber === $order->get_meta(LabelGenerationOutward::OUTWARD_PARCEL_NUMBER_META_KEY)) {
+                    $order->update_meta_data(LabelGenerationOutward::OUTWARD_PARCEL_NUMBER_META_KEY, '');
+                }
                 $order->save();
             }
 

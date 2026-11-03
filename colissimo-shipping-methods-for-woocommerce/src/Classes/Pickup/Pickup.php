@@ -37,23 +37,6 @@ abstract class Pickup {
     }
 
     protected function getCurrentCustomerAddress(): array {
-        $address = [
-            'countryCode' => '',
-            'zipCode'     => '',
-            'city'        => '',
-            'address'     => '',
-        ];
-
-        if (WC()->customer) {
-            $customer = WC()->customer;
-            $address  = [
-                'countryCode' => $customer->get_shipping_country(),
-                'zipCode'     => $customer->get_shipping_postcode(),
-                'city'        => $customer->get_shipping_city(),
-                'address'     => $customer->get_shipping_address_1(),
-            ];
-        }
-
-        return $address;
+        return Helper::getCustomerShippingAddress();
     }
 }

@@ -12,12 +12,13 @@ defined('ABSPATH') || die('Restricted Access');
 
 class OutwardLabelDb {
     const LABEL_TYPE_OUTWARD = 'outward';
+    const BORDEREAU_ID_MIGRATED_OPTION = 'lpc_bordereau_id_migrated';
 
     public function getTableDefinition(): string {
         global $wpdb;
 
-        return 'CREATE TABLE IF NOT EXISTS ' . $wpdb->prefix . 'lpc_outward_label (
-            id               INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+        return 'CREATE TABLE ' . $wpdb->prefix . 'lpc_outward_label (
+            id               INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
             order_id         INT(20) UNSIGNED NOT NULL,
             label            MEDIUMBLOB       NULL,
             label_format     VARCHAR(10)      NULL,
@@ -27,8 +28,8 @@ class OutwardLabelDb {
             bordereau_id     INT(20) UNSIGNED NULL,
             detail           TEXT             NULL,
             printed          TINYINT(1)       NOT NULL DEFAULT 0,
-            status_id        INT UNSIGNED     NULL,
-            label_type       VARCHAR(10)      NOT NULL DEFAULT "CLASSIC",
+            status_id        INT(10) UNSIGNED NULL,
+            label_type       VARCHAR(10)      NOT NULL DEFAULT \'CLASSIC\',
             cn23_format      VARCHAR(10)      NULL,
             PRIMARY KEY (id),
             INDEX order_id (order_id),
@@ -335,16 +336,9 @@ VALUES ' . $stringLabelsToInsert
     public function updateToVersion164() {
         global $wpdb;
 
-        $columns        = $wpdb->get_results('SHOW COLUMNS FROM ' . $wpdb->prefix . 'lpc_outward_label');
-        $updatedColumns = array_filter($columns,
-            fn($column) => 'bordereau_id' === $column->Field || 'detail' === $column->Field);
-        if (!empty($updatedColumns)) {
+        if (!empty(Helper::get_option(self::BORDEREAU_ID_MIGRATED_OPTION, 0))) {
             return;
         }
-
-        $wpdb->query('ALTER TABLE ' . $wpdb->prefix . 'lpc_outward_label ADD COLUMN `bordereau_id` BIGINT(20) NULL');
-
-        $wpdb->query('ALTER TABLE ' . $wpdb->prefix . 'lpc_outward_label ADD COLUMN `detail` LONGTEXT NULL');
 
         if (OrderQueries::isHposActive()) {
             $wpdb->query(
@@ -363,6 +357,8 @@ VALUES ' . $stringLabelsToInsert
                 ON DUPLICATE KEY UPDATE `bordereau_id` = VALUES(`bordereau_id`)'
             );
         }
+
+        update_option(self::BORDEREAU_ID_MIGRATED_OPTION, 1, false);
     }
 
     public function updateToVersion165() {
@@ -409,18 +405,11 @@ VALUES ' . $stringLabelsToInsert
     public function updateToVersion192() {
         global $wpdb;
 
-        $columns        = $wpdb->get_results('SHOW COLUMNS FROM ' . $wpdb->prefix . 'lpc_outward_label');
-        $updatedColumns = array_filter(
-            $columns,
-            fn($column) => 'cn23_format' === $column->Field
+        $wpdb->query(
+            'UPDATE ' . $wpdb->prefix . 'lpc_outward_label
+            SET `cn23_format` = "PDF"
+            WHERE `cn23` IS NOT NULL AND `cn23_format` IS NULL'
         );
-
-        if (!empty($updatedColumns)) {
-            return;
-        }
-
-        $wpdb->query('ALTER TABLE ' . $wpdb->prefix . 'lpc_outward_label ADD COLUMN `cn23_format` VARCHAR(10) NULL');
-        $wpdb->query('UPDATE ' . $wpdb->prefix . 'lpc_outward_label SET `cn23_format` = "PDF" WHERE `cn23` IS NOT NULL');
     }
 
     public function addBordereauIdOnBordereauGeneration($outwardLabelIds, $bordereauId) {

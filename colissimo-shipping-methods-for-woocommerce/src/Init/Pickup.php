@@ -25,6 +25,8 @@ class Pickup {
 
         add_action('wp_ajax_lpc_pickup_ajax_content', [$this, 'initPickupContent']);
         add_action('wp_ajax_nopriv_lpc_pickup_ajax_content', [$this, 'initPickupContent']);
+        add_action('wp_ajax_lpc_pickup_widget_token', [$this, 'getWidgetToken']);
+        add_action('wp_ajax_nopriv_lpc_pickup_widget_token', [$this, 'getWidgetToken']);
         add_filter('wcpay_express_checkout_js_params', [$this, 'forcePhoneForExpressPayments'], 11, 1);
         add_action('woocommerce_before_order_object_save', [$this, 'applyClosestRelayForExpressPayments'], 10, 1);
     }
@@ -42,6 +44,23 @@ class Pickup {
         $content = ob_get_clean();
 
         Helper::endAjax(true, ['content' => $content]);
+    }
+
+    public function getWidgetToken() {
+        $pickupWidgetApi = Register::get('pickupWidgetApi');
+        $token           = $pickupWidgetApi->authenticate();
+
+        if (empty($token)) {
+            Helper::endAjax(false);
+        }
+
+        Helper::endAjax(
+            true,
+            [
+                'token'         => $token,
+                'remainingTime' => $pickupWidgetApi->getRemainingValidity(),
+            ]
+        );
     }
 
     public function forcePhoneForExpressPayments(array $params): array {

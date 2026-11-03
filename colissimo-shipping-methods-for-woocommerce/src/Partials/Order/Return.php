@@ -3,8 +3,8 @@
 defined('ABSPATH') || die('Restricted Access');
 ?>
 <input type="hidden"
-       id="lpc_select_products"
-       value="<?php esc_attr_e('You need to select at least one item to generate a label', 'colissimo-shipping-methods-for-woocommerce'); ?>" />
+	   id="lpc_select_products"
+	   value="<?php esc_attr_e('You need to select at least one item to generate a label', 'colissimo-shipping-methods-for-woocommerce'); ?>" />
 <input type="hidden" id="lpc_generate_url" value="<?php echo esc_url($args['generateUrlBase'], null, 'javascript'); ?>" />
 <input type="hidden" id="lpc_download_url" value="<?php echo esc_url($args['downloadUrlBase'], null, 'javascript'); ?>" />
 
@@ -23,6 +23,11 @@ defined('ABSPATH') || die('Restricted Access');
 		<tbody>
             <?php
             foreach ($args['order']->get_items() as $item) {
+                $product = $item->get_product();
+                if (empty($product) || !$product->needs_shipping()) {
+                    continue;
+                }
+
                 $itemId = $item->get_id();
                 ?>
 				<tr>
@@ -92,15 +97,23 @@ defined('ABSPATH') || die('Restricted Access');
 			<li><?php esc_html_e('Print your label and stick it on your parcel.', 'colissimo-shipping-methods-for-woocommerce'); ?></li>
 			<li>
                 <?php esc_html_e('Drop off your parcel at the post office of your choice:', 'colissimo-shipping-methods-for-woocommerce'); ?>
-				<a target="_blank"
-				   href="https://localiser.laposte.fr/?jesuis=particulier&contact=vente&qp=<?php echo esc_attr($args['order']->get_shipping_postcode()); ?>">https://localiser.laposte.fr</a>
+                <?php
+                if (!empty($args['dropOffModal'])) {
+                    $args['dropOffModal']
+                        ->echo_button(__('Find a drop-off point', 'colissimo-shipping-methods-for-woocommerce'), 'lpcOpenDropOffWidget')
+                        ->echo_modal();
+                } else {
+                    ?>
+					<a target="_blank"
+					   href="https://localiser.laposte.fr/?jesuis=particulier&contact=vente&qp=<?php echo esc_attr($args['order']->get_shipping_postcode()); ?>">https://localiser.laposte.fr</a>
+                <?php } ?>
 			</li>
         <?php } ?>
 		<li>
             <?php
             wp_kses(
                 printf(
-                    // translators: %s tracking link HTML anchor tag
+                // translators: %s tracking link HTML anchor tag
                     esc_html__('Track your parcel shipment on %s', 'colissimo-shipping-methods-for-woocommerce'),
                     '<a target="_blank" href="https://laposte.fr/outils/suivre-vos-envois">https://laposte.fr/suivi</a>'
                 ),

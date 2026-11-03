@@ -14,6 +14,7 @@ class PickupWidgetApi extends RestApi {
     const OPTION_TOKEN_KEY = 'lpc_pickup_widget_token';
     const OPTION_TOKEN_KEY_EXPIRATION = 'lpc_pickup_widget_token_expiration';
     const PICKUP_WIDGET_TOKEN_VALIDITY = 1700;
+    const PICKUP_WIDGET_TOKEN_MARGIN = 300;
 
     public string $token = '';
 
@@ -21,11 +22,17 @@ class PickupWidgetApi extends RestApi {
         return self::API_BASE_URL . $action;
     }
 
+    public function getRemainingValidity(): int {
+        $tokenExpiration = (int) Helper::get_option(self::OPTION_TOKEN_KEY_EXPIRATION, 0);
+
+        return max(0, $tokenExpiration - time() - self::PICKUP_WIDGET_TOKEN_MARGIN);
+    }
+
     public function authenticate(bool $forceReload = false): string {
         $token           = Helper::get_option(self::OPTION_TOKEN_KEY);
         $tokenExpiration = Helper::get_option(self::OPTION_TOKEN_KEY_EXPIRATION, 0);
 
-        if (!$forceReload && !empty($token) && (time() < (int) $tokenExpiration)) {
+        if (!$forceReload && !empty($token) && (time() + self::PICKUP_WIDGET_TOKEN_MARGIN < (int) $tokenExpiration)) {
             $this->token = $token;
 
             return $this->token;

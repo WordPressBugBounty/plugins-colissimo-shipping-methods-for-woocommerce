@@ -6,7 +6,9 @@ defined('ABSPATH') || die('Restricted Access');
 
 use Colissimo\Classes\Label\LabelGenerationInward;
 use Colissimo\Classes\Label\LabelGenerationPayload;
+use Colissimo\Classes\Pickup\PickupWidget;
 use Colissimo\Classes\Shipping\Relay;
+use Colissimo\Core\Modal;
 use Colissimo\Core\Register;
 use Colissimo\Helpers\Helper;
 use Colissimo\Helpers\Logger;
@@ -19,6 +21,7 @@ use WC_Order;
 
 class ReturnProducts {
     const RETURN_PAGE_ALIAS = 'lpcreturn';
+    const DROP_OFF_WIDGET_JS_URL = PickupWidget::BASE_URL . '/widget-colissimo/js/jquery.plugin.colissimo.pdd.min.js';
 
     private $listMailBoxPickingDatesResponse;
 
@@ -111,10 +114,29 @@ class ReturnProducts {
         }
 
         if (empty($balStep)) {
-            // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet
-            echo '<link rel="stylesheet" href="' . esc_url(Helper::getCssUrl('orders/return.css')) . '" />';
-            // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript
-            echo '<script src="' . esc_url(Helper::getJsUrl('orders/return.js')) . '"></script>';
+            $dropOffWidgetInfo    = $this->getDropOffWidgetInfo($order, $data['securedReturn']);
+            $returnScriptDeps     = ['jquery'];
+            $data['dropOffModal'] = null;
+
+            wp_enqueue_style('lpc_return', Helper::getCssUrl('orders/return.css'), [], LPC_VERSION);
+
+            if (!empty($dropOffWidgetInfo)) {
+                wp_enqueue_style('lpc_mapbox', PickupWidget::MAP_CSS_URL, [], LPC_VERSION);
+                wp_enqueue_style('lpc_pickup_widget', Helper::getCssUrl('pickup/widget.css'), [], LPC_VERSION);
+                wp_register_script('lpc_mapbox', PickupWidget::MAP_JS_URL, ['jquery'], LPC_VERSION, true);
+                wp_register_script('lpc_drop_off_widget', self::DROP_OFF_WIDGET_JS_URL, ['lpc_mapbox'], LPC_VERSION, true);
+
+                $returnScriptDeps = ['lpc_drop_off_widget'];
+
+                $data['dropOffModal'] = $this->getDropOffModal();
+                $data['dropOffModal']->loadScripts();
+            }
+
+            wp_enqueue_script('lpc_return', Helper::getJsUrl('orders/return.js'), $returnScriptDeps, LPC_VERSION, true);
+
+            if (!empty($dropOffWidgetInfo)) {
+                wp_localize_script('lpc_return', 'lpcDropOffWidgetInfo', $dropOffWidgetInfo);
+            }
 
             Helper::renderPartial('Order/Return.php', $data);
         } else {
@@ -184,6 +206,49 @@ class ReturnProducts {
                 }
             }
         }
+    }
+
+    private function getDropOffModal(): Modal {
+        $lpcImageUrl  = Helper::getImageUrl('colissimo_cropped.png');
+        $imageHtmlTag = '<img src="' . esc_url($lpcImageUrl) . '" style="max-width: 90px; display:inline; vertical-align: middle;">';
+
+        // The container keeps the id the widget stylesheet targets
+        return new Modal('<div id="lpc_widget_container" class="widget_colissimo"></div>', $imageHtmlTag, 'lpc_return_drop_off_container');
+    }
+
+    private function getDropOffWidgetInfo(WC_Order $order, bool $securedReturn): array {
+        $token = Register::get('pickupWidgetApi')->authenticate();
+        if (empty($token)) {
+            return [];
+        }
+
+        $widgetInfo = [
+            'URLColissimo'     => PickupWidget::BASE_URL,
+            'token'            => $token,
+            'ceCountry'        => $order->get_shipping_country() ?: 'FR',
+            'origin'           => 'CMS',
+            'typeDropOffPoint' => 'ALL',
+            'filterReturnType' => $securedReturn ? '3' : '0',
+            // Documentation says not mandatory but without returnDate the widget doesn't list anything
+            'returnDate'       => wp_date('d/m/Y'),
+        ];
+
+        $address = str_replace('’', "'", $order->get_shipping_address_1());
+        if (!empty($address)) {
+            $widgetInfo['ceAddress'] = $address;
+        }
+
+        $zipCode = preg_replace('#[^0-9a-zA-Z]#', '', $order->get_shipping_postcode());
+        if (!empty($zipCode)) {
+            $widgetInfo['ceZipCode'] = $zipCode;
+        }
+
+        $city = str_replace('’', "'", $order->get_shipping_city());
+        if (!empty($city)) {
+            $widgetInfo['ceTown'] = $city;
+        }
+
+        return array_merge($widgetInfo, Helper::getWidgetCustomization());
     }
 
     /**

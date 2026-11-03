@@ -7,6 +7,7 @@
  */
 window.lpcQz = (function ($) {
     let ready = false;
+    let connection = null;
 
     function signingConfig() {
         return 'undefined' === typeof lpcQzSigning ? {} : lpcQzSigning;
@@ -30,6 +31,11 @@ window.lpcQz = (function ($) {
 
         qz.api.setPromiseType(function (resolver) {
             return new Promise(resolver);
+        });
+
+        // QZ Tray or the operator can close the socket at any time, the memoized connection has to go with it
+        qz.websocket.setClosedCallbacks(function () {
+            connection = null;
         });
 
         if (!isSigned()) {
@@ -70,14 +76,24 @@ window.lpcQz = (function ($) {
     function connect() {
         setup();
 
-        if (qz.websocket.isActive()) {
-            return Promise.resolve();
+        if (null === connection) {
+            if (qz.websocket.isActive()) {
+                return Promise.resolve();
+            }
+
+            connection = qz.websocket.connect().catch(function (error) {
+                connection = null;
+
+                throw error;
+            });
         }
 
-        return qz.websocket.connect();
+        return connection;
     }
 
     function disconnect() {
+        connection = null;
+
         if (qz.websocket.isActive()) {
             qz.websocket.disconnect();
         }

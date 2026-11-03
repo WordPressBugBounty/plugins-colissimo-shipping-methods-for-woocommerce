@@ -45,6 +45,30 @@ jQuery(function ($) {
         });
     }
 
+    // Called by the modal once its template has been injected in the page
+    window.lpcOpenDropOffWidget = function () {
+        const $container = $('#lpc_widget_container');
+
+        if ($container.length === 0 || typeof lpcDropOffWidgetInfo === 'undefined' || typeof $container.frameColissimoOpen !== 'function') {
+            return;
+        }
+
+        try {
+            $container.frameColissimoOpen(lpcDropOffWidgetInfo);
+        } catch (e) {
+            console.error(e);
+        }
+
+        // We need to close the widget to be able to open it again
+        $('.lpc-modal .modal-close').on('click', function () {
+            try {
+                $container.frameColissimoClose();
+            } catch (e) {
+                console.error(e);
+            }
+        });
+    };
+
     function getSelectedProducts() {
         const $checkedProducts = $('#lpc_return_table').find('input[type="checkbox"]:checked').not('#lpc_selectall');
         const selectedProducts = [];

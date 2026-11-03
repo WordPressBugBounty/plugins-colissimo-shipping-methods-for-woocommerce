@@ -20,8 +20,8 @@ class SlipDb {
     public function getTableDefinition(): string {
         global $wpdb;
 
-        return 'CREATE TABLE IF NOT EXISTS ' . $wpdb->prefix . 'lpc_bordereau (
-            id                    INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+        return 'CREATE TABLE ' . $wpdb->prefix . 'lpc_bordereau (
+            id                    INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
             bordereau_external_id INT(20) UNSIGNED NOT NULL,
             created_at            DATETIME         NULL,
             delivery_slip         MEDIUMBLOB       NULL,

@@ -111,7 +111,7 @@ class InwardDeleteAction {
 
             // Remove the related order meta
             $order = wc_get_order($orderId);
-            if (!empty($order)) {
+            if (!empty($order) && $trackingNumber === $order->get_meta(LabelGenerationInward::INWARD_PARCEL_NUMBER_META_KEY)) {
                 $order->update_meta_data(LabelGenerationInward::INWARD_PARCEL_NUMBER_META_KEY, '');
                 $order->save();
             }

@@ -24,23 +24,26 @@ jQuery(function ($) {
         $(this).addClass('lpc_label_printed');
         let specificAction = $(this).attr('data-link');
         let trackingNumber = $(this).attr('data-tracking-number');
-        switch ($(this).attr('data-format')) {
-            case 'ZPL':
-            case 'DPL':
-                let lpc_thermal_labels_infos = [
-                    {
-                        lpc_tracking_number: trackingNumber
-                    }
-                ];
+        let format = $(this).attr('data-format');
 
-                printThermal(lpc_thermal_labels_infos);
+        if ('ZPL' === format || 'DPL' === format) {
+            let lpc_thermal_labels_infos = [
+                {
+                    lpc_tracking_number: trackingNumber
+                }
+            ];
 
-            // We don't break here because we want to print in PDF the invoice and maybe the CN23
-            case 'PDF':
+            // The invoice and the possible CN23 are still printed as PDF, but only once the thermal labels have been sent
+            printThermal(lpc_thermal_labels_infos, function () {
                 printPDF(specificAction);
-                break;
+            });
+
+            return;
         }
 
+        if ('PDF' === format) {
+            printPDF(specificAction);
+        }
     });
 
     $('.lpc_label_action_send_email').off('click').on('click', function () {
@@ -91,61 +94,89 @@ jQuery(function ($) {
         }
     });
 
-    function printThermal(thermalLabelsInfos) {
+    // onDone runs once the labels have been handed over to the printer, whatever the outcome
+    function printThermal(thermalLabelsInfos, onDone) {
+        let pending = onDone;
+        const done = function () {
+            if (pending) {
+                const callback = pending;
+                pending = null;
+                callback();
+            }
+        };
+
         $.ajax({
             type: 'POST',
             url: lpcLabelsActions.thermalLabelPrintActionUrl,
             data: {lpc_thermal_labels_infos: thermalLabelsInfos},
             dataType: 'json'
-        }).success(function (response) {
+        }).done(function (response) {
             const labels = JSON.parse(response);
             if (!labels || 0 === labels.length) {
+                done();
                 return;
             }
 
-            printThermalLabels(labels);
-        }).error(function (error) {
+            printThermalLabels(labels, done);
+        }).fail(function (error) {
             console.error(error);
+            done();
         });
+    }
+
+    function isQzConfigured() {
+        return 'undefined' !== typeof lpcQz && lpcQz.isAvailable() && (lpcQz.isSigned() || !!lpcLabelsActions.qzPrinter);
     }
 
     // Print the thermal labels through QZ Tray, falling back to the legacy print kit URLs
-    // when QZ Tray is not installed/running (e.g. merchant updated but hasn't set it up yet).
-    function printThermalLabels(labels) {
-        if ('undefined' === typeof lpcQz || !lpcQz.isAvailable()) {
+    function printThermalLabels(labels, onSent) {
+        const done = onSent || function () {};
+
+        if (!isQzConfigured()) {
             printThermalLegacy(labels);
+            done();
+
             return;
         }
 
-        lpcQz.connect().then(function () {
-            getQzConfig()
-                .then(function (config) {
+        lpcQz.connect().then(
+            function () {
+                return getQzConfig().then(function (config) {
                     return printRawSequentially(config, labels);
-                })
-                .then(function () {
-                    lpcQz.disconnect();
-                })
-                .catch(function (error) {
-                    lpcQz.disconnect();
-                    console.error(error);
-                    if ($('#lpc_thermal_print_error_message').length === 0) {
-                        displayErrors(lpcLabelsActions.errorMsgPrintThermal + ' ' + error);
-                    }
                 });
-        }, function (connectError) {
-            // Could not reach QZ Tray: fall back to the legacy print kit so existing setups keep working
-            console.warn('QZ Tray unavailable, falling back to the legacy print kit', connectError);
-            printThermalLegacy(labels);
+            },
+            function (connectError) {
+                // Could not reach QZ Tray: fall back to the legacy print kit so existing setups keep working
+                console.warn('QZ Tray unavailable, falling back to the legacy print kit', connectError);
+                printThermalLegacy(labels);
+            }
+        ).then(done, function (error) {
+            console.error(error);
+            if ($('#lpc_thermal_print_error_message').length === 0) {
+                displayErrors(lpcLabelsActions.errorMsgPrintThermal + ' ' + error);
+            }
+            done();
         });
     }
 
-    function getQzConfig() {
-        const printerName = lpcLabelsActions.qzPrinter;
-        const printerPromise = printerName ? qz.printers.find(printerName) : qz.printers.getDefault();
+    let qzConfigPromise = null;
 
-        return printerPromise.then(function (printer) {
-            return qz.configs.create(printer);
-        });
+    // The printer lookup is a signed call, so it costs a round trip to the website: do it once per page
+    function getQzConfig() {
+        if (null === qzConfigPromise) {
+            const printerName = lpcLabelsActions.qzPrinter;
+            const printerPromise = printerName ? qz.printers.find(printerName) : qz.printers.getDefault();
+
+            qzConfigPromise = printerPromise.then(function (printer) {
+                return qz.configs.create(printer);
+            }).catch(function (error) {
+                qzConfigPromise = null;
+
+                throw error;
+            });
+        }
+
+        return qzConfigPromise;
     }
 
     function printRawSequentially(config, labels) {
@@ -180,7 +211,7 @@ jQuery(function ($) {
                 type: 'GET',
                 url: info.legacyUrl,
                 dataType: 'html'
-            }).error(function (xhr, status, error) {
+            }).fail(function (xhr, status, error) {
                 console.error('error on label ' + info.trackingNumber);
                 console.error('Error message: ' + xhr.responseText);
                 console.error('Error message: ' + error);
@@ -237,8 +268,9 @@ jQuery(function ($) {
         // We want the labels to be printed from older to latest
         thermalPrintInfo.reverse();
 
-        printThermal(thermalPrintInfo);
-        printPDF(url);
+        printThermal(thermalPrintInfo, function () {
+            printPDF(url);
+        });
     }
 
     function displayErrors(errorMessage) {

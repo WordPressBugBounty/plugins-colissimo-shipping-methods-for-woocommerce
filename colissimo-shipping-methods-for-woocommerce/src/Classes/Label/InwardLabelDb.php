@@ -15,8 +15,8 @@ class InwardLabelDb {
     public function getTableDefinition(): string {
         global $wpdb;
 
-        return 'CREATE TABLE IF NOT EXISTS ' . $wpdb->prefix . 'lpc_inward_label (
-            id                      INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+        return 'CREATE TABLE ' . $wpdb->prefix . 'lpc_inward_label (
+            id                      INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
             order_id                INT(20) UNSIGNED NOT NULL,
             label                   MEDIUMBLOB       NULL,
             label_format            VARCHAR(10)      NULL,
@@ -29,7 +29,7 @@ class InwardLabelDb {
             PRIMARY KEY (id),
             INDEX order_id (order_id),
             INDEX tracking_number (tracking_number),
-            INDEX outward_tracking_number (outward_tracking_number)  
+            INDEX outward_tracking_number (outward_tracking_number)
         ) ' . $wpdb->get_charset_collate();
     }
 
@@ -359,17 +359,11 @@ class InwardLabelDb {
     public function updateToVersion192() {
         global $wpdb;
 
-        $columns        = $wpdb->get_results('SHOW COLUMNS FROM ' . $wpdb->prefix . 'lpc_inward_label');
-        $updatedColumns = array_filter($columns,
-            fn($column) => 'cn23_format' === $column->Field
+        $wpdb->query(
+            'UPDATE ' . $wpdb->prefix . 'lpc_inward_label
+            SET `cn23_format` = "PDF"
+            WHERE `cn23` IS NOT NULL AND `cn23_format` IS NULL'
         );
-
-        if (!empty($updatedColumns)) {
-            return;
-        }
-
-        $wpdb->query('ALTER TABLE ' . $wpdb->prefix . 'lpc_inward_label ADD COLUMN `cn23_format` VARCHAR(10) NULL');
-        $wpdb->query('UPDATE ' . $wpdb->prefix . 'lpc_inward_label SET `cn23_format` = "PDF" WHERE `cn23` IS NOT NULL');
     }
 
     public function updatePrintedLabel($trackingNumbers) {

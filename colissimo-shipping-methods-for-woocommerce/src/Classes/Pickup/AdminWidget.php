@@ -100,22 +100,7 @@ class AdminWidget {
             $args['widgetInfo']['dyWeight'] = $weight;
         }
 
-        if (Helper::get_option('lpc_prCustomizeWidget', 'no') === 'yes') {
-            $args['lpcAddressTextColor'] = Helper::get_option('lpc_prAddressTextColor', null);
-            if (!empty($args['lpcAddressTextColor'])) {
-                $args['widgetInfo']['couleur1'] = $args['lpcAddressTextColor'];
-            }
-            $args['lpcListTextColor'] = Helper::get_option('lpc_prListTextColor', null);
-            if (!empty($args['lpcListTextColor'])) {
-                $args['widgetInfo']['couleur2'] = $args['lpcListTextColor'];
-            }
-
-            $font = Helper::getFont('lpc_prDisplayFont');
-            if (!empty($font)) {
-                $args['widgetInfo']['font'] = $font;
-            }
-        }
-
+        $args['widgetInfo'] = array_merge($args['widgetInfo'], Helper::getWidgetCustomization());
         $args['widgetInfo'] = wp_json_encode($args['widgetInfo']);
 
         $lpcImageUrl  = Helper::getImageUrl('colissimo_cropped.png');

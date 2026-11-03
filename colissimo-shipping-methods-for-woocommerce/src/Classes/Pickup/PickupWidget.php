@@ -41,6 +41,9 @@ class PickupWidget extends Pickup {
 
                     wp_register_script('lpc_widgets_web_js_url', self::WEB_JS_URL, ['lpc_mapbox'], '0.1', ['in_footer' => true]);
 
+                    $customerAddress = $this->getCurrentCustomerAddress();
+                    $widgetInfo      = $this->getWidgetInfo($customerAddress);
+
                     $args = [
                         'baseAjaxUrl'           => admin_url('admin-ajax.php'),
                         'messagePhoneRequired'  => __('Please set a valid phone number', 'colissimo-shipping-methods-for-woocommerce'),
@@ -50,6 +53,7 @@ class PickupWidget extends Pickup {
                             'An error occurred when trying to save the selected relay, please select it again.',
                             'colissimo-shipping-methods-for-woocommerce'
                         ),
+                        'tokenRemainingTime'    => $this->pickUpWidgetApi->getRemainingValidity(),
                     ];
                     wp_localize_script('lpc_widgets_web_js_url', 'lpcPickUpSelection', $args);
 
@@ -62,9 +66,6 @@ class PickupWidget extends Pickup {
                         true
                     );
                     wp_enqueue_script('lpc_widget');
-
-                    $customerAddress = $this->getCurrentCustomerAddress();
-                    $widgetInfo      = $this->getWidgetInfo($customerAddress);
 
                     wp_add_inline_script('lpc_widget', 'window.lpc_widget_info = ' . $widgetInfo, 'before');
 
@@ -109,7 +110,7 @@ class PickupWidget extends Pickup {
         if ('yes' === Helper::get_option('lpc_select_default_pr', 'no')
             && empty($currentRelay)
             && count($address) === count(array_filter($address))) {
-            $currentRelay = $this->lpcPickupWebService->getDefaultPickupLocationInfoWS($address);
+            $currentRelay = $this->lpcPickupWebService->selectDefaultPickupLocation($address);
         }
 
         $args = [
@@ -167,21 +168,7 @@ class PickupWidget extends Pickup {
             $widgetInfo['ceTown'] = $city;
         }
 
-        if (Helper::get_option('lpc_prCustomizeWidget', 'no') === 'yes') {
-            $lpcAddressTextColor = Helper::get_option('lpc_prAddressTextColor', null);
-            if (!empty($lpcAddressTextColor)) {
-                $widgetInfo['couleur1'] = $lpcAddressTextColor;
-            }
-            $lpcListTextColor = Helper::get_option('lpc_prListTextColor', null);
-            if (!empty($lpcListTextColor)) {
-                $widgetInfo['couleur2'] = $lpcListTextColor;
-            }
-
-            $font = Helper::getFont('lpc_prDisplayFont');
-            if (!empty($font)) {
-                $widgetInfo['font'] = $font;
-            }
-        }
+        $widgetInfo = array_merge($widgetInfo, Helper::getWidgetCustomization());
 
         return wp_json_encode($widgetInfo);
     }

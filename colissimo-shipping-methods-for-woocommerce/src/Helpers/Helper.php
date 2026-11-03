@@ -750,6 +750,34 @@ class Helper {
         return $fontNames[$fontValue] ?? null;
     }
 
+    /**
+     * Style parameters shared by all the Colissimo widgets
+     */
+    public static function getWidgetCustomization(): array {
+        if ('yes' !== self::get_option('lpc_prCustomizeWidget', 'no')) {
+            return [];
+        }
+
+        $customization = [];
+
+        $addressTextColor = self::get_option('lpc_prAddressTextColor', null);
+        if (!empty($addressTextColor)) {
+            $customization['couleur1'] = $addressTextColor;
+        }
+
+        $listTextColor = self::get_option('lpc_prListTextColor', null);
+        if (!empty($listTextColor)) {
+            $customization['couleur2'] = $listTextColor;
+        }
+
+        $font = self::getFont('lpc_prDisplayFont');
+        if (!empty($font)) {
+            $customization['font'] = $font;
+        }
+
+        return $customization;
+    }
+
     public static function getWooSession() {
         $woo = WC();
 
@@ -758,6 +786,43 @@ class Helper {
         }
 
         return $woo->session;
+    }
+
+    public static function getCustomerShippingAddress(): array {
+        $address = [
+            'countryCode' => '',
+            'zipCode'     => '',
+            'city'        => '',
+            'address'     => '',
+        ];
+
+        $customer = WC()->customer;
+        if (empty($customer)) {
+            return $address;
+        }
+
+        return [
+            'countryCode' => $customer->get_shipping_country(),
+            'zipCode'     => $customer->get_shipping_postcode(),
+            'city'        => $customer->get_shipping_city(),
+            'address'     => $customer->get_shipping_address_1(),
+        ];
+    }
+
+    public static function getAddressFingerprint(array $address): string {
+        return md5(
+            strtolower(
+                implode(
+                    '|',
+                    [
+                        $address['countryCode'] ?? '',
+                        $address['zipCode'] ?? '',
+                        $address['city'] ?? '',
+                        $address['address'] ?? '',
+                    ]
+                )
+            )
+        );
     }
 
     private static function isPackagingFitting(array $packagingDimensions, array $productDimensions): bool {

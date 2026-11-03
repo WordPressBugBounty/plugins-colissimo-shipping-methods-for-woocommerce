@@ -1,6 +1,36 @@
 var $affectMethodDiv;
 
 jQuery(function ($) {
+    function lpcScheduleTokenRefresh(delay) {
+        window.setTimeout(
+            function () {
+                fetch(
+                    lpcPickUpSelection.baseAjaxUrl,
+                    {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: new URLSearchParams({action: 'lpc_pickup_widget_token'})
+                    }
+                ).then(function (response) {
+                    return response.json();
+                }).then(function (response) {
+                    if (response.type !== 'success') {
+                        return;
+                    }
+
+                    if (window.lpc_widget_info) {
+                        window.lpc_widget_info.token = response.data.token;
+                    }
+
+                    lpcScheduleTokenRefresh(response.data.remainingTime * 1000);
+                }).catch(function (error) {
+                    console.error('Error refreshing the pickup widget token:', error);
+                });
+            },
+            delay
+        );
+    }
+
     function lpcSaveSelectedRelay(point, retryOnError) {
         const $errorDiv = $('#lpc_layer_error_message');
 
@@ -85,4 +115,9 @@ jQuery(function ($) {
             }
         });
     });
+
+    // lpcPickUpSelection not available on the admin order page
+    if (typeof lpcPickUpSelection !== 'undefined' && typeof lpcPickUpSelection.tokenRemainingTime !== 'undefined') {
+        lpcScheduleTokenRefresh(parseInt(lpcPickUpSelection.tokenRemainingTime, 10) * 1000);
+    }
 });

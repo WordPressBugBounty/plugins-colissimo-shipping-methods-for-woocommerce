@@ -126,7 +126,7 @@ class PickupWebService extends Pickup {
         if ('yes' === Helper::get_option('lpc_select_default_pr', 'no')
             && empty($currentRelay)
             && count($address) === count(array_filter($address))) {
-            $currentRelay = $this->getDefaultPickupLocationInfoWS($address);
+            $currentRelay = $this->selectDefaultPickupLocation($address);
         }
 
         $args = [
@@ -270,13 +270,20 @@ class PickupWebService extends Pickup {
         if (isset($resultWs['errorCode']) && '0' == $resultWs['errorCode']) {
             $relays = $resultWs['listePointRetraitAcheminement'];
             if (count($relays) >= 1) {
-                $defaultRelay = array_shift($relays);
-                $this->lpcPickUpSelection->setCurrentPickUpLocationInfo($defaultRelay);
-
-                return $defaultRelay;
+                return array_shift($relays);
             }
         }
 
         return null;
+    }
+
+    public function selectDefaultPickupLocation(array $address): ?array {
+        $defaultRelay = $this->getDefaultPickupLocationInfoWS($address);
+
+        if (!empty($defaultRelay)) {
+            $this->lpcPickUpSelection->setAutoSelectedPickUpLocationInfo($defaultRelay, $address);
+        }
+
+        return $defaultRelay;
     }
 }

@@ -3,7 +3,7 @@ defined('ABSPATH') || die('Restricted Access');
 ?>
 <button id="<?php echo esc_attr($args['elementId']); ?>"
 		data-lpc-template="<?php echo esc_attr($args['templateId']); ?>"
-		class="button"
+		class="button wp-element-button"
     <?php
     if (!empty($args['callback'])) {
         echo 'data-lpc-callback="' . esc_attr($args['callback']) . '"';

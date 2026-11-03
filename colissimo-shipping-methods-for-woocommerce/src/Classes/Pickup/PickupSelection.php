@@ -22,6 +22,7 @@ class PickupSelection {
     const PICKUP_LOCATION_LABEL_META_KEY = '_lpc_meta_pickUpLocationLabel';
     const PICKUP_PRODUCT_CODE_META_KEY = '_lpc_meta_pickUpProductCode';
     const PICKUP_LOCATION_SESSION_VAR_NAME = 'lpc_pickUpInfo';
+    const PICKUP_AUTO_SELECTION_SESSION_VAR_NAME = 'lpc_pickUpAutoSelectionAddress';
     const PICKUP_ADDRESS_FORCED_MARKER = 'lpc_forced_shipping_address_on_relay';
 
     protected $ajaxDispatcher;
@@ -67,14 +68,28 @@ class PickupSelection {
     }
 
     public function getCurrentPickUpLocationInfo() {
-        $wcSession = Helper::getWooSession();
+        $wcSession  = Helper::getWooSession();
+        $pickUpInfo = $wcSession->get(self::PICKUP_LOCATION_SESSION_VAR_NAME);
 
-        return $wcSession->get(self::PICKUP_LOCATION_SESSION_VAR_NAME);
+        if (!empty($pickUpInfo) && !$this->isPickUpLocationStillValid($pickUpInfo)) {
+            Logger::debug(
+                'Ignoring the saved pickup data, it does not match the current shipping address',
+                [
+                    'pickupData'      => $pickUpInfo,
+                    'customerAddress' => Helper::getCustomerShippingAddress(),
+                ]
+            );
+
+            return null;
+        }
+
+        return $pickUpInfo;
     }
 
     public function setCurrentPickUpLocationInfo($pickUpInfo, $orderId = null) {
         $wcSession = Helper::getWooSession();
         $wcSession->set(self::PICKUP_LOCATION_SESSION_VAR_NAME, $pickUpInfo);
+        $wcSession->set(self::PICKUP_AUTO_SELECTION_SESSION_VAR_NAME, null);
 
         Logger::debug(
             'Changing the saved pickup data',
@@ -84,6 +99,33 @@ class PickupSelection {
                 'saved'      => $this->getCurrentPickUpLocationInfo(),
             ]
         );
+    }
+
+    /**
+     * Save a relay the plugin picked itself, tied to the address it was computed from.
+     * It is dropped as soon as that address changes, so a response computed for an outdated address cannot survive it.
+     */
+    public function setAutoSelectedPickUpLocationInfo(array $pickUpInfo, array $address): void {
+        $this->setCurrentPickUpLocationInfo($pickUpInfo);
+
+        $wcSession = Helper::getWooSession();
+        $wcSession->set(self::PICKUP_AUTO_SELECTION_SESSION_VAR_NAME, Helper::getAddressFingerprint($address));
+    }
+
+    private function isPickUpLocationStillValid($pickUpInfo): bool {
+        $customerAddress = Helper::getCustomerShippingAddress();
+
+        if (empty($customerAddress['countryCode'])) {
+            return true;
+        }
+
+        if (!empty($pickUpInfo['codePays']) && $pickUpInfo['codePays'] !== $customerAddress['countryCode']) {
+            return false;
+        }
+
+        $autoSelectionAddress = Helper::getWooSession()->get(self::PICKUP_AUTO_SELECTION_SESSION_VAR_NAME);
+
+        return empty($autoSelectionAddress) || Helper::getAddressFingerprint($customerAddress) === $autoSelectionAddress;
     }
 
     public function getAjaxUrl() {

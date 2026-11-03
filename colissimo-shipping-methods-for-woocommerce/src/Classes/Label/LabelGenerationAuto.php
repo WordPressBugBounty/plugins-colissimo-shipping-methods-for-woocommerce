@@ -3,6 +3,7 @@
 namespace Colissimo\Classes\Label;
 
 use Colissimo\Classes\Order\OrderStatuses;
+use Colissimo\Classes\Shipping\ShippingMethods;
 use Colissimo\Core\Register;
 use Colissimo\Helpers\Logger;
 use Colissimo\Helpers\Helper;
@@ -13,9 +14,14 @@ defined('ABSPATH') || die('Restricted Access');
 
 class LabelGenerationAuto {
     protected $labelGenerationOutward;
+    protected $shippingMethods;
 
-    public function __construct(?LabelGenerationOutward $labelGenerationOutward = null) {
+    public function __construct(
+        ?LabelGenerationOutward $labelGenerationOutward = null,
+        ?ShippingMethods $shippingMethods = null
+    ) {
         $this->labelGenerationOutward = Register::get('labelGenerationOutward');
+        $this->shippingMethods        = Register::get('shippingMethods');
     }
 
     public function init() {
@@ -35,6 +41,12 @@ class LabelGenerationAuto {
 
         if (!is_array($orderStatuses)) {
             $orderStatuses = [$orderStatuses];
+        }
+
+        // Only apply on orders using a Colissimo method
+        $shippingMethodUsed = $this->shippingMethods->getColissimoShippingMethodOfOrder($order);
+        if (empty($shippingMethodUsed)) {
+            return;
         }
 
         $disabled = in_array(OrderStatuses::WC_LPC_DISABLE, $orderStatuses);

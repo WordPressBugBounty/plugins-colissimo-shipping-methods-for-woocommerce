@@ -135,7 +135,6 @@ class LabelGenerationPayload {
     protected $capabilitiesPerCountry;
     protected $orderNumber;
     protected $eoriAdded;
-    protected $dimensionsAdded;
 
     /** @var ShippingMethods */
     protected $lpcShippingMethods;
@@ -164,9 +163,8 @@ class LabelGenerationPayload {
             ],
         ];
 
-        $this->isReturnLabel   = false;
-        $this->eoriAdded       = false;
-        $this->dimensionsAdded = false;
+        $this->isReturnLabel = false;
+        $this->eoriAdded     = false;
     }
 
     public function withSender(?array $sender = null, array $customParams = []) {
@@ -453,8 +451,6 @@ class LabelGenerationPayload {
                 'key'   => 'HEIGHT',
                 'value' => array_pop($dimensions),
             ];
-
-            $this->dimensionsAdded = true;
         }
 
         return $this;
@@ -749,17 +745,6 @@ class LabelGenerationPayload {
             throw new Exception(esc_html__('Please define a mobile phone number for SMS notification tracking', 'colissimo-shipping-methods-for-woocommerce'));
         }
 
-        // Must have dimensions
-        if (!$this->dimensionsAdded) {
-            Logger::error(
-                'Package dimensions missing for DDP label generation',
-                [
-                    'shippingMethod' => $shippingMethodUsed,
-                ]
-            );
-            throw new Exception(esc_html__('Please enter the package dimensions', 'colissimo-shipping-methods-for-woocommerce'));
-        }
-
         // Must have EORI
         if (!$this->eoriAdded) {
             Logger::error(
@@ -944,7 +929,7 @@ class LabelGenerationPayload {
                     'value' => $this->isReturnLabel ? self::CUSTOMS_CATEGORY_RETURN_OF_ARTICLES : $outwardCustomCategory,
                 ],
             ],
-            'invoiceNumber'              => $order->get_order_number(),
+            'invoiceNumber'              => $this->getCustomsInvoiceNumber($order),
         ];
 
         if (!empty($lastMidCode) && self::US_COUNTRY_CODE === $destinationCountryId && count($orderItems) === 1) {
@@ -985,7 +970,7 @@ class LabelGenerationPayload {
                 [
                     [
                         'originalIdent'         => self::FORCED_ORIGINAL_IDENT,
-                        'originalInvoiceNumber' => $order->get_order_number(),
+                        'originalInvoiceNumber' => $this->getCustomsInvoiceNumber($order),
                         'originalInvoiceDate'   => $originalInvoiceDate,
                         'originalParcelNumber'  => $originalParcelNumber,
                     ],
@@ -1190,7 +1175,24 @@ class LabelGenerationPayload {
     }
 
     public function assemble() {
-        return array_merge($this->payload); // makes a copy
+        $payload = array_merge($this->payload); // makes a copy
+
+        /**
+         * Filter on the custom fields when generating a label
+         *
+         * @since 3.1.2
+         */
+        $fields = apply_filters('lpc_payload_fields', $payload['fields']['field'] ?? [], $this->getOrderNumber(), $this->getIsReturnLabel());
+        if (!empty($fields)) {
+            $payload['fields']['field'] = $fields;
+        }
+
+        /**
+         * Filter on the whole payload when generating a label
+         *
+         * @since 3.1.2
+         */
+        return apply_filters('lpc_payload', $payload, $this->getOrderNumber(), $this->getIsReturnLabel());
     }
 
     /**
@@ -1482,6 +1484,13 @@ class LabelGenerationPayload {
 
     protected function getOriginalParcelNumberFromInvoice(WC_Order $order) {
         return $order->get_meta(LabelGenerationOutward::OUTWARD_PARCEL_NUMBER_META_KEY);
+    }
+
+    protected function getCustomsInvoiceNumber(WC_Order $order): string {
+        // Compat with PDF Invoices & Packing Slips for WooCommerce
+        $invoiceNumber = $order->get_meta('_wcpdf_invoice_number');
+
+        return empty($invoiceNumber) ? $order->get_order_number() : $invoiceNumber;
     }
 
     public function getLabelFormat() {

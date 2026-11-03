@@ -4,7 +4,7 @@
 
 namespace Colissimo\Vendor\Composer\Autoload;
 
-class ComposerStaticInit1ee9c1c9cba57d9c04895fc286b7b6de
+class ComposerStaticInit0b847c969f1c75dea7aee8f268ae9af8
 {
     public static $prefixLengthsPsr4 = array (
         'C' =>
@@ -198,9 +198,9 @@ class ComposerStaticInit1ee9c1c9cba57d9c04895fc286b7b6de
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit1ee9c1c9cba57d9c04895fc286b7b6de::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit1ee9c1c9cba57d9c04895fc286b7b6de::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticInit1ee9c1c9cba57d9c04895fc286b7b6de::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit0b847c969f1c75dea7aee8f268ae9af8::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit0b847c969f1c75dea7aee8f268ae9af8::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInit0b847c969f1c75dea7aee8f268ae9af8::$classMap;
 
         }, null, ClassLoader::class);
     }

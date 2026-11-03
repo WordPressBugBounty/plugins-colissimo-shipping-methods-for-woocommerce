@@ -157,6 +157,8 @@ class Update {
     }
 
     protected function runUpdate($versionInstalled) {
+        $this->dbDefinition->createOrUpdateTables();
+
         if (Helper::get_option(self::LPC_MIGRATION13_DONE_OPTION_NAME, false) !== false) {
             $this->adminNotices->add_notice(
                 'label_migration',
@@ -167,20 +169,14 @@ class Update {
             delete_option(self::LPC_MIGRATION13_DONE_OPTION_NAME);
         }
 
-        // Update from version under 1.3
         if (version_compare($versionInstalled, '1.3') === - 1) {
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
-            $this->dbDefinition->defineTableLabel();
             $this->handleMigration13();
         }
 
-        // Update from version under 1.5
         if (version_compare($versionInstalled, '1.5') === - 1) {
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
             $this->shippingZones->addCustomZonesOrUpdateOne('Zone France');
         }
 
-        // Update from version under 1.6
         if (version_compare($versionInstalled, '1.6') === - 1) {
             $currentlpc_email_outward_tracking = Helper::get_option(OutwardLabelEmailManager::EMAIL_OUTWARD_TRACKING_OPTION, 'no');
 
@@ -193,24 +189,19 @@ class Update {
             update_option(OutwardLabelEmailManager::EMAIL_OUTWARD_TRACKING_OPTION, $newlpc_email_outward_tracking, false);
         }
 
-        // Update from version under 1.6.4
         if (version_compare($versionInstalled, '1.6.4') === - 1) {
             $this->outwardLabelDb->updateToVersion164();
         }
 
-        // Update from version under 1.6.5
         if (version_compare($versionInstalled, '1.6.5') === - 1) {
             $this->outwardLabelDb->updateToVersion165();
         }
 
-        // Update from version under 1.6.8
         if (version_compare($versionInstalled, '1.6.8') === - 1) {
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
             $this->createCapabilities();
             $this->shippingMethods->moveAlwaysFreeOption();
         }
 
-        // Update from version under 1.7.1
         if (version_compare($versionInstalled, '1.7.1') === - 1) {
             foreach (WC_Shipping_Zones::get_zones() as $zone) {
                 if ('France' === $zone['zone_name']) {
@@ -219,13 +210,9 @@ class Update {
                     $newZone->save();
                 }
             }
-
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
         }
 
-        // Update from version under 1.7.2
         if (version_compare($versionInstalled, '1.7.2') === - 1) {
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
             $this->outwardLabelDb->updateToVersion172();
             $countries  = [
                 'SendingService_austria',
@@ -246,7 +233,6 @@ class Update {
             }
         }
 
-        // Update from version under 1.7.4
         if (version_compare($versionInstalled, '1.7.4') === - 1) {
             update_option('lpc_parent_id_webservices', '');
             $this->inwardLabelDb->updateToVersion174();
@@ -258,14 +244,12 @@ class Update {
             }
         }
 
-        // Update from version under 1.8.2
         if (version_compare($versionInstalled, '1.8.2') === - 1) {
             $this->outwardLabelDb->updateToVersion182();
             $this->inwardLabelDb->updateToVersion182();
             $this->bordereauDb->updateToVersion182();
         }
 
-        // Update from version under 1.9.2
         if (version_compare($versionInstalled, '1.9.2') === - 1) {
             $passwordAlreadyEncrypted = Helper::get_option('lpc_pwd_encrypted', 0);
             if (empty($passwordAlreadyEncrypted)) {
@@ -281,7 +265,6 @@ class Update {
             $this->inwardLabelDb->updateToVersion192();
         }
 
-        // Update from version under 1.9.4
         if (version_compare($versionInstalled, '1.9.4') === - 1) {
             $noShippingClassUpdated = Helper::get_option('lpc_no_shipping_class_updated', 0);
             if (empty($noShippingClassUpdated)) {
@@ -290,12 +273,6 @@ class Update {
             }
         }
 
-        // Update from version under 2.0.0
-        if (version_compare($versionInstalled, '2.0.0') === - 1) {
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
-        }
-
-        // Update from version under 2.2.0
         if (version_compare($versionInstalled, '2.2.0') === - 1) {
             $returnByClient = Helper::get_option('lpc_customers_download_return_label', 'no');
             if ('no' !== $returnByClient) {
@@ -303,7 +280,6 @@ class Update {
             }
         }
 
-        // Update from version under 2.5.0
         if (version_compare($versionInstalled, '2.5.0', '<')) {
             $relayTypes = Helper::get_option('lpc_relay_point_type', 'all');
 
@@ -318,8 +294,6 @@ class Update {
                     update_option('lpc_relay_types', '1');
                 }
             }
-
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
         }
 
         if (version_compare($versionInstalled, '2.7.0', '<')) {
@@ -331,8 +305,6 @@ class Update {
         }
 
         if (version_compare($versionInstalled, '2.8.3', '<')) {
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
-
             $logsFilePath = wp_upload_dir()['basedir'] . DIRECTORY_SEPARATOR . 'colissimo' . DIRECTORY_SEPARATOR . 'logs' . DIRECTORY_SEPARATOR . 'general.log';
             if (file_exists($logsFilePath)) {
                 $oldLogs = explode('<log>', file_get_contents($logsFilePath));
@@ -373,9 +345,11 @@ class Update {
         }
 
         if (version_compare($versionInstalled, '3.1.0', '<')) {
-            $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
             $this->shippingZones->addCustomZonesOrUpdateOne('OM1');
         }
+
+        // Reload cache for capabilities
+        $this->capabilitiesPerCountry->saveCapabilitiesPerCountryInDatabase();
     }
 
     /** Functions for update to 1.3 **/
@@ -384,7 +358,7 @@ class Update {
             'label_migration',
             'notice-success',
             sprintf(
-                // translators: %s is the plugin version number.
+            // translators: %s is the plugin version number.
                 __(
                     'Thanks for updating Colissimo Official plugin to version %s. This version needs to modify the database structure and it will take a few minutes. While the migration is being done, you can use the plugin as usual but you won\'t be able to see the labels in the Colissimo listing. Please contact the Colissimo support if they are still not visible in a few hours.',
                     'colissimo-shipping-methods-for-woocommerce'

@@ -1310,6 +1310,27 @@
       }
     },
     {
+      "id": "lpc_customs",
+      "type": "sectionend"
+    },
+    {
+      "id": "lpc_eoris_info",
+      "type": "title"
+    },
+    {
+      "id": "lpc_eori",
+      "type": "eori"
+    },
+    {
+      "id": "lpc_eoris_info",
+      "type": "sectionend"
+    },
+    {
+      "id": "lpc_eori",
+      "type": "title",
+      "title": ""
+    },
+    {
       "id": "lpc_eori_number",
       "type": "text",
       "title": "EORI number",
@@ -1350,7 +1371,7 @@
       "desc_tip": true
     },
     {
-      "id": "lpc_customs",
+      "id": "lpc_eori",
       "type": "sectionend"
     },
     {
@@ -1643,6 +1664,15 @@
       "content": "logs",
       "title": "Colissimo logs",
       "text": "See logs",
+      "class": "",
+      "default": ""
+    },
+    {
+      "id": "lpc_check_db",
+      "type": "lpc_check_db",
+      "title": "Database",
+      "desc": "Check that all the plugin tables and columns are present, and add the missing ones",
+      "text": "Check the database",
       "class": "",
       "default": ""
     },

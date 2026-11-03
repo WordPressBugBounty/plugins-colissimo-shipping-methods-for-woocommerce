@@ -13,6 +13,7 @@ use Exception;
 use Colissimo\Classes\Shipping\Expert;
 use Colissimo\Classes\Shipping\ExpertDdp;
 use Colissimo\Core\Ajax;
+use Colissimo\Core\DbDefinition;
 use Colissimo\Core\Modal;
 use Colissimo\Core\Register;
 use WC_Admin_Settings;
@@ -27,6 +28,7 @@ defined('ABSPATH') || die('Restricted Access');
 class SettingsTab {
     const LPC_SETTINGS_TAB_ID = 'lpc';
     const AJAX_TASK_REFRESH_LOGS = 'logs/refresh';
+    const AJAX_TASK_CHECK_DB = 'database/check';
 
     /**
      * @var array Options available
@@ -85,6 +87,8 @@ class SettingsTab {
         $this->iniMidCode();
         $this->initShippingDate();
         $this->initThermalPrintGuide();
+        $this->initCheckDatabase();
+        $this->initEori();
     }
 
     private function initSettingsPage() {
@@ -145,6 +149,10 @@ class SettingsTab {
         add_action('woocommerce_admin_field_onboarding', [$this, 'displayOnboarding']);
     }
 
+    protected function initEori() {
+        add_action('woocommerce_admin_field_eori', [$this, 'displayEori']);
+    }
+
     protected function initSeeLog() {
         add_action('woocommerce_admin_field_lpcmodal', [$this, 'displayModalButton']);
         $this->ajaxDispatcher->register(self::AJAX_TASK_REFRESH_LOGS, [$this, 'refreshLogs']);
@@ -164,6 +172,51 @@ class SettingsTab {
 
     protected function initDocumentation() {
         add_action('woocommerce_admin_field_lpcdoc', [$this, 'displayDocumentation']);
+    }
+
+    protected function initCheckDatabase() {
+        add_action('woocommerce_admin_field_lpc_check_db', [$this, 'displayCheckDatabase']);
+        $this->ajaxDispatcher->register(self::AJAX_TASK_CHECK_DB, [$this, 'checkDatabase']);
+    }
+
+    public function displayCheckDatabase($field) {
+        wp_register_script('lpc_settings_check_db', Helper::getJsUrl('settings/check_database.js'), ['jquery'], LPC_VERSION, true);
+        wp_localize_script(
+            'lpc_settings_check_db',
+            'lpcCheckDatabase',
+            [
+                'ajaxURL' => $this->ajaxDispatcher->getUrlForTask(self::AJAX_TASK_CHECK_DB),
+                'error'   => __('An error occurred while checking the database.', 'colissimo-shipping-methods-for-woocommerce'),
+            ]
+        );
+        wp_enqueue_script('lpc_settings_check_db');
+
+        Helper::renderPartial(
+            'Settings/CheckDatabase.php',
+            [
+                'title' => $field['title'],
+                'type'  => sanitize_title($field['type']),
+                'text'  => $field['text'],
+                'desc'  => $field['desc'] ?? '',
+            ]
+        );
+    }
+
+    public function checkDatabase() {
+        $changes = (new DbDefinition())->defineTableLabel();
+
+        if (empty($changes)) {
+            $message = __('The database structure is correct, nothing to fix.', 'colissimo-shipping-methods-for-woocommerce');
+        } else {
+            $message = sprintf(
+            // translators: %s is the list of the modifications applied to the database.
+                __('The database structure has been fixed (%s).', 'colissimo-shipping-methods-for-woocommerce'),
+                implode(', ', $changes)
+            );
+            Logger::debug('Database structure fixed', ['changes' => $changes]);
+        }
+
+        return $this->ajaxDispatcher->makeSuccess(['message' => esc_html($message)]);
     }
 
     protected function initMultiSelectOrderStatus() {
@@ -291,6 +344,12 @@ class SettingsTab {
             'privilegeForm' => $urls['urlContact'] ?? 'https://www.colissimo.entreprise.laposte.fr/contact',
         ];
         Helper::renderPartial('Settings/Onboarding.php', $args);
+    }
+
+    public function displayEori($field) {
+        wp_register_style('lpc_customs', Helper::getCssUrl('settings/customs.css'), [], LPC_VERSION);
+        wp_enqueue_style('lpc_customs');
+        Helper::renderPartial('Settings/Eori.php');
     }
 
     /**
