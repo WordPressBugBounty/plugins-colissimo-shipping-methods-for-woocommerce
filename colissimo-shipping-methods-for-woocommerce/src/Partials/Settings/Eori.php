@@ -11,6 +11,7 @@ defined('ABSPATH') || die('Restricted Access');
 		</p>
 		<p>
 			<?php printf(
+			// translators: %s is a link whose text is "click here".
 					esc_html__('To get your EORI SIREN number: %s', 'colissimo-shipping-methods-for-woocommerce'),
 					'<a target="_blank" href="https://www.douane.gouv.fr/service-en-ligne/demande-dautorisation-douaniere-et-fiscale-soprano">' . esc_html__('click here',
 					                                                                                                                                         'colissimo-shipping-methods-for-woocommerce') . '</a>'
@@ -35,6 +36,7 @@ defined('ABSPATH') || die('Restricted Access');
 		</p>
 		<p>
 			<?php printf(
+			// translators: %1$s and %2$s are links whose text is "here".
 					esc_html__('More regulatory information %1$s and %2$s.', 'colissimo-shipping-methods-for-woocommerce'),
 					'<a target="_blank" href="https://www.douane.gouv.fr/vers-un-eori-siren-unique-et-un-portail-europeen-pour-les-autorisations-douanieres">' . esc_html__('here',
 					                                                                                                                                                        'colissimo-shipping-methods-for-woocommerce') . '</a>',

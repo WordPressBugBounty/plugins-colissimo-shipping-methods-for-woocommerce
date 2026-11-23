@@ -112,12 +112,12 @@ class Pickup {
                 ]
             );
 
-            $order->set_shipping_address_1($closestRelay['adresse1']);
-            $order->set_shipping_address_2($closestRelay['adresse2'] ?? '');
-            $order->set_shipping_postcode($closestRelay['codePostal']);
-            $order->set_shipping_city($closestRelay['localite']);
-            $order->set_shipping_country($closestRelay['codePays']);
-            $order->set_shipping_company($closestRelay['nom'] ?? '');
+            $order->set_shipping_address_1(wc_clean($closestRelay['adresse1']));
+            $order->set_shipping_address_2(wc_clean($closestRelay['adresse2'] ?? ''));
+            $order->set_shipping_postcode(wc_clean($closestRelay['codePostal']));
+            $order->set_shipping_city(wc_clean($closestRelay['localite']));
+            $order->set_shipping_country(wc_clean($closestRelay['codePays']));
+            $order->set_shipping_company(wc_clean($closestRelay['nom'] ?? ''));
 
             $order->update_meta_data(PickupSelection::PICKUP_LOCATION_ID_META_KEY, $closestRelay['identifiant']);
             $order->update_meta_data(PickupSelection::PICKUP_LOCATION_LABEL_META_KEY, $closestRelay['nom']);

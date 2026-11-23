@@ -102,7 +102,9 @@ class CreationTable extends WP_List_Table {
     }
 
     protected function column_default($item, $column_name) {
-        return $item[$column_name];
+        $htmlColumns = ['cb', 'lpc-id'];
+
+        return in_array($column_name, $htmlColumns, true) ? $item[$column_name] : esc_html($item[$column_name]);
     }
 
     protected function get_data($current_page = 0, $per_page = 0, $args = [], $filters = []): array {

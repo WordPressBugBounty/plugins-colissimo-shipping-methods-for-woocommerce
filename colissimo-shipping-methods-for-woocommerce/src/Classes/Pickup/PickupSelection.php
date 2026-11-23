@@ -10,6 +10,7 @@ use Colissimo\Helpers\OrderQueries;
 use Exception;
 use Colissimo\Core\Register;
 use Colissimo\Classes\Shipping\Relay;
+use WC_Customer;
 use WC_Order;
 use YITH_Vendors_Orders;
 
@@ -23,6 +24,8 @@ class PickupSelection {
     const PICKUP_PRODUCT_CODE_META_KEY = '_lpc_meta_pickUpProductCode';
     const PICKUP_LOCATION_SESSION_VAR_NAME = 'lpc_pickUpInfo';
     const PICKUP_AUTO_SELECTION_SESSION_VAR_NAME = 'lpc_pickUpAutoSelectionAddress';
+    const PHP_SESSION_FALLBACK_KEY = 'lpc_pickUpInfoFallback';
+    const PHP_SESSION_AUTO_SELECTION_FALLBACK_KEY = 'lpc_pickUpAutoSelectionAddressFallback';
     const PICKUP_ADDRESS_FORCED_MARKER = 'lpc_forced_shipping_address_on_relay';
 
     protected $ajaxDispatcher;
@@ -37,6 +40,15 @@ class PickupSelection {
 
         add_filter('woocommerce_order_button_html', [$this, 'preventPlaceOrderButton'], 10, 2);
         add_action('woocommerce_checkout_process', [$this, 'preventCheckoutProcess']);
+        // The checkout page reads the pickup selection while rendering, when it is too late to open a session.
+        add_action(
+            'template_redirect',
+            function () {
+                if (is_checkout() && $this->isRelayRequired()) {
+                    $this->startPhpSession();
+                }
+            }
+        );
     }
 
     public function init() {
@@ -50,7 +62,7 @@ class PickupSelection {
     }
 
     public function pickUpLocationListener() {
-        $pickUpInfo = Helper::getVar(self::PICKUP_LOCATION_SESSION_VAR_NAME, null, 'array');
+        $pickUpInfo = wc_clean(Helper::getVar(self::PICKUP_LOCATION_SESSION_VAR_NAME, null, 'array'));
         $this->setCurrentPickUpLocationInfo($pickUpInfo);
 
         ob_start();
@@ -71,6 +83,14 @@ class PickupSelection {
         $wcSession  = Helper::getWooSession();
         $pickUpInfo = $wcSession->get(self::PICKUP_LOCATION_SESSION_VAR_NAME);
 
+        if (empty($pickUpInfo)) {
+            $pickUpInfo = $this->getPhpSessionValue(self::PHP_SESSION_FALLBACK_KEY);
+
+            if (!empty($pickUpInfo)) {
+                Logger::debug('Pickup data read from the PHP session fallback', ['pickupData' => $pickUpInfo]);
+            }
+        }
+
         if (!empty($pickUpInfo) && !$this->isPickUpLocationStillValid($pickUpInfo)) {
             Logger::debug(
                 'Ignoring the saved pickup data, it does not match the current shipping address',
@@ -88,8 +108,12 @@ class PickupSelection {
 
     public function setCurrentPickUpLocationInfo($pickUpInfo, $orderId = null) {
         $wcSession = Helper::getWooSession();
+
         $wcSession->set(self::PICKUP_LOCATION_SESSION_VAR_NAME, $pickUpInfo);
         $wcSession->set(self::PICKUP_AUTO_SELECTION_SESSION_VAR_NAME, null);
+
+        $this->setPhpSessionValue(self::PHP_SESSION_FALLBACK_KEY, $pickUpInfo);
+        $this->setPhpSessionValue(self::PHP_SESSION_AUTO_SELECTION_FALLBACK_KEY, null);
 
         Logger::debug(
             'Changing the saved pickup data',
@@ -108,8 +132,12 @@ class PickupSelection {
     public function setAutoSelectedPickUpLocationInfo(array $pickUpInfo, array $address): void {
         $this->setCurrentPickUpLocationInfo($pickUpInfo);
 
+        $fingerprint = Helper::getAddressFingerprint($address);
+
         $wcSession = Helper::getWooSession();
-        $wcSession->set(self::PICKUP_AUTO_SELECTION_SESSION_VAR_NAME, Helper::getAddressFingerprint($address));
+        $wcSession->set(self::PICKUP_AUTO_SELECTION_SESSION_VAR_NAME, $fingerprint);
+
+        $this->setPhpSessionValue(self::PHP_SESSION_AUTO_SELECTION_FALLBACK_KEY, $fingerprint);
     }
 
     private function isPickUpLocationStillValid($pickUpInfo): bool {
@@ -124,8 +152,57 @@ class PickupSelection {
         }
 
         $autoSelectionAddress = Helper::getWooSession()->get(self::PICKUP_AUTO_SELECTION_SESSION_VAR_NAME);
+        if (empty($autoSelectionAddress)) {
+            $autoSelectionAddress = $this->getPhpSessionValue(self::PHP_SESSION_AUTO_SELECTION_FALLBACK_KEY);
+        }
 
         return empty($autoSelectionAddress) || Helper::getAddressFingerprint($customerAddress) === $autoSelectionAddress;
+    }
+
+    /**
+     * Mirror of the WooCommerce session for the pickup selection.
+     * Some hosting stacks drop the WooCommerce session cookie of a guest between the AJAX selection and the checkout
+     * request, which leaves the order without a pickup point; the native PHP session survives there.
+     */
+    private function getPhpSessionValue(string $key) {
+        if (!$this->startPhpSession() || empty($_SESSION[$key]) || !is_string($_SESSION[$key])) {
+            return null;
+        }
+
+        return json_decode(sanitize_text_field(wp_unslash($_SESSION[$key])), true);
+    }
+
+    private function setPhpSessionValue(string $key, $value): void {
+        if (!$this->startPhpSession()) {
+            return;
+        }
+
+        if (null === $value || '' === $value || [] === $value) {
+            unset($_SESSION[$key]);
+
+            return;
+        }
+
+        $_SESSION[$key] = wp_json_encode($value);
+    }
+
+    private function startPhpSession(): bool {
+        // A logged-in customer is identified by their account in every context, so the WooCommerce session is enough
+        if (is_user_logged_in()) {
+            return false;
+        }
+
+        $status = session_status();
+
+        if (PHP_SESSION_ACTIVE === $status) {
+            return true;
+        }
+
+        if (PHP_SESSION_DISABLED === $status || headers_sent()) {
+            return false;
+        }
+
+        return session_start();
     }
 
     public function getAjaxUrl() {
@@ -138,6 +215,29 @@ class PickupSelection {
         add_action('woocommerce_update_order', [$this, 'forceShippingAddressOnRelay']);
         add_action('woocommerce_checkout_order_processed', [$this, 'savePickupAddressOnOrder'], 10, 2);
         add_action('woocommerce_store_api_checkout_order_processed', [$this, 'colissimoUsageApi'], 10, 1);
+        add_action('woocommerce_store_api_checkout_order_processed', [$this, 'restoreCustomerShippingAddress'], 20);
+    }
+
+    public function restoreCustomerShippingAddress($order): void {
+        $customerId = $order->get_customer_id();
+        if (empty($customerId) || !OrderQueries::hasShippingMethod($order, Relay::ID)) {
+            return;
+        }
+
+        $sessionCustomer = WC()->customer;
+        if (empty($sessionCustomer) || '' === $sessionCustomer->get_shipping_address_1()) {
+            return;
+        }
+
+        $customer = new WC_Customer($customerId);
+        $customer->set_shipping_company($sessionCustomer->get_shipping_company());
+        $customer->set_shipping_address_1($sessionCustomer->get_shipping_address_1());
+        $customer->set_shipping_address_2($sessionCustomer->get_shipping_address_2());
+        $customer->set_shipping_postcode($sessionCustomer->get_shipping_postcode());
+        $customer->set_shipping_city($sessionCustomer->get_shipping_city());
+        $customer->set_shipping_state($sessionCustomer->get_shipping_state());
+        $customer->set_shipping_country($sessionCustomer->get_shipping_country());
+        $customer->save();
     }
 
     public function colissimoUsageApi($order): void {
@@ -292,12 +392,12 @@ class PickupSelection {
     }
 
     private function applyAddress(WC_Order $order, array $address): void {
-        $order->set_shipping_address_1($address['adresse1'] ?? '');
-        $order->set_shipping_address_2(!empty($address['adresse2']) ? $address['adresse2'] : '');
-        $order->set_shipping_postcode(!empty($address['codePostal']) ? $address['codePostal'] : '');
-        $order->set_shipping_city(!empty($address['localite']) ? $address['localite'] : '');
-        $order->set_shipping_country(!empty($address['codePays']) ? $address['codePays'] : '');
-        $order->set_shipping_company(!empty($address['nom']) ? $address['nom'] : '');
+        $order->set_shipping_address_1(wc_clean($address['adresse1'] ?? ''));
+        $order->set_shipping_address_2(!empty($address['adresse2']) ? wc_clean($address['adresse2']) : '');
+        $order->set_shipping_postcode(!empty($address['codePostal']) ? wc_clean($address['codePostal']) : '');
+        $order->set_shipping_city(!empty($address['localite']) ? wc_clean($address['localite']) : '');
+        $order->set_shipping_country(!empty($address['codePays']) ? wc_clean($address['codePays']) : '');
+        $order->set_shipping_company(!empty($address['nom']) ? wc_clean($address['nom']) : '');
         $order->set_shipping_state('');
     }
 
@@ -410,8 +510,12 @@ class PickupSelection {
     }
 
     private function isRelayRequired(): bool {
+        $wcCart = WC()->cart;
+        if (empty($wcCart)) {
+            return false;
+        }
+
         $wcSession      = Helper::getWooSession();
-        $wcCart         = WC()->cart;
         $shippingMethod = $wcSession->get('chosen_shipping_methods');
         $needShipping   = $wcCart->needs_shipping();
 

@@ -5,6 +5,7 @@ namespace Colissimo\Classes\Label;
 use Colissimo\Core\Ajax;
 use Colissimo\Core\Register;
 use Colissimo\Helpers\Helper;
+use Colissimo\Helpers\OrderQueries;
 use Colissimo\Core\MergePdf;
 use Exception;
 
@@ -92,8 +93,8 @@ class InwardDownloadAccountAction {
     private function generateCustomLabel($orderId, $products) {
         $order = wc_get_order($orderId);
 
-        // Make sure the user tries to download for their own order
-        if (!$this->currentUserOwnsOrder($order)) {
+        // Make sure the user tries to download for their own order and that the shop still allows it
+        if (!$this->currentUserOwnsOrder($order) || !OrderQueries::canCustomerGenerateInwardLabel($order)) {
             $this->handleErrorRedirect(__('You are not allowed to generate a return label for this order.', 'colissimo-shipping-methods-for-woocommerce'));
         }
 

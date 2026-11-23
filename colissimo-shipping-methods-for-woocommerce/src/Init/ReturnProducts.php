@@ -13,7 +13,6 @@ use Colissimo\Core\Register;
 use Colissimo\Helpers\Helper;
 use Colissimo\Helpers\Logger;
 use Colissimo\Helpers\OrderQueries;
-use DateInterval;
 use DateTime;
 use DateTimeZone;
 use Exception;
@@ -32,30 +31,7 @@ class ReturnProducts {
     }
 
     public function addReturnLabelDownload(WC_Order $order) {
-        // Check if we allow return labels
-        $returnGenerationType = Helper::get_option('lpc_customers_download_return_label', 'no');
-        if ('no' === $returnGenerationType || is_order_received_page()) {
-            return;
-        }
-
-        // We only allow return labels for a certain amount of days
-        $returnGenerationDays = Helper::get_option('lpc_customers_download_return_label_days', 14);
-        $limitDate            = $order->get_date_created();
-        $limitDate->add(new DateInterval('P' . $returnGenerationDays . 'D'));
-        if ($limitDate < new DateTime()) {
-            return;
-        }
-
-        // If no parcel has been sent, no need for return label
-        $outwardLabelDb  = Register::get('outwardLabelDb');
-        $trackingNumbers = $outwardLabelDb->getOrderLabels($order->get_id());
-        if (empty($trackingNumbers)) {
-            return;
-        }
-
-        // Make sure the country is eligible for return labels
-        $capabilitiesPerCountry = Register::get('capabilitiesPerCountry');
-        if (false === $capabilitiesPerCountry->getReturnProductCodeForDestination($order->get_shipping_country())) {
+        if (is_order_received_page() || !OrderQueries::canCustomerReturn($order)) {
             return;
         }
 
@@ -82,7 +58,7 @@ class ReturnProducts {
         $order   = wc_get_order($orderId);
 
         $currentUser = wp_get_current_user();
-        if (empty($order) || $order->get_user_id() !== $currentUser->ID) {
+        if (empty($order) || $order->get_user_id() !== $currentUser->ID || !OrderQueries::canCustomerReturn($order)) {
             esc_html_e('You are not allowed to access the return label for this order.', 'colissimo-shipping-methods-for-woocommerce');
 
             return;
@@ -101,7 +77,7 @@ class ReturnProducts {
             'order'           => $order,
             'generateUrlBase' => $labelInwardDownloadAccountAction->getUrlForCustom($orderId),
             'downloadUrlBase' => $labelInwardDownloadAccountAction->getUrlForDownload($orderId, ''),
-            'balReturn'       => 'yes' === Helper::get_option('lpc_bal_return', 'no') && 'FR' === $order->get_shipping_country(),
+            'balReturn'       => OrderQueries::canCustomerUseMailBoxReturn($order),
             'balReturnUrl'    => $balUrl,
             'securedReturn'   => false,
         ];
@@ -111,6 +87,12 @@ class ReturnProducts {
         if (!empty($accountInformation['optionRetourToken']) && 1 === intval(Helper::get_option('lpc_secured_return', 0))) {
             $data['securedReturn'] = true;
             $data['balReturn']     = false;
+        }
+
+        if (!empty($balStep) && !$data['balReturn']) {
+            esc_html_e('You are not allowed to access the return label for this order.', 'colissimo-shipping-methods-for-woocommerce');
+
+            return;
         }
 
         if (empty($balStep)) {
@@ -345,7 +327,7 @@ class ReturnProducts {
     private function getReturnTrackingNumber(WC_Order $order, $data) {
         try {
             $products = json_decode($data['products'], true);
-            if (empty($products)) {
+            if (empty($products) || !OrderQueries::canCustomerGenerateInwardLabel($order)) {
                 return false;
             }
 

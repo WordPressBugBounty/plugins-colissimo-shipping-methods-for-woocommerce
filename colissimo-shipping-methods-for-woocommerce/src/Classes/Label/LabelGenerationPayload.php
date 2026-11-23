@@ -79,6 +79,14 @@ class LabelGenerationPayload {
     private const US_COUNTRY_CODE = 'US';
     private const GB_COUNTRY_CODE = 'GB';
     private const SPANISH_COUNTRY_CODE = 'ES';
+
+    // Some destinations don't display line3 on labels
+    private const COUNTRIES_NO_LINE_3 = [
+        self::BELGIAN_COUNTRY_CODE,
+        self::SWITZERLAND_COUNTRY_CODE,
+        self::US_COUNTRY_CODE,
+    ];
+
     // Spanish territories served through the postal network: Canary Islands (35 & 38), Ceuta (51), Melilla (52)
     public const SPANISH_POSTAL_NETWORK_ZIP_PREFIXES = ['35', '38', '51', '52'];
     public const COUNTRIES_NEEDING_STATE = ['CA', self::US_COUNTRY_CODE];
@@ -324,9 +332,7 @@ class LabelGenerationPayload {
             }
         }
 
-        // Required bypass because Colissimo Labels for Belgium or Switzerland don't display line3
-        $countryCodesNoLine3 = [self::BELGIAN_COUNTRY_CODE, self::SWITZERLAND_COUNTRY_CODE];
-        if (in_array($addressee['countryCode'], $countryCodesNoLine3)) {
+        if (in_array($addressee['countryCode'], self::COUNTRIES_NO_LINE_3)) {
             if (!empty($addressee['street2'])) {
                 $payloadAddressee['address']['line2'] = $payloadAddressee['address']['line2'] . ' ' . $addressee['street2'];
             }

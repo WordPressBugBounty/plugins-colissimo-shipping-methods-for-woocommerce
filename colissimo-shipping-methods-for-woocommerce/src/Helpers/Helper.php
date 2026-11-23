@@ -345,7 +345,7 @@ class Helper {
             $var = htmlspecialchars_decode(htmlspecialchars($var, ENT_IGNORE, 'UTF-8'));
         }
 
-        return preg_replace('#<[a-zA-Z/]+[^>]*>#Ui', '', $var);
+        return wp_strip_all_tags($var);
     }
 
     public static function get_option($option, $default = '') {

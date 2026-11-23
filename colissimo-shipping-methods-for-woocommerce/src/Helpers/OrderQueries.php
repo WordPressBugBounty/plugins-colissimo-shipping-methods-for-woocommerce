@@ -6,6 +6,7 @@ namespace Colissimo\Helpers;
 
 use Automattic\WooCommerce\Utilities\OrderUtil;
 use Colissimo\Api\TrackingApi;
+use Colissimo\Core\Register;
 
 defined('ABSPATH') || die('Restricted Access');
 
@@ -744,6 +745,70 @@ class OrderQueries {
         $shipping = current($shippings);
 
         return $shipping->get_method_id() === $method;
+    }
+
+    /**
+     * Customer-facing return policy: must be enforced by every entry point letting a customer
+     * generate or download a return label, not only by the button on the order details page.
+     */
+    public static function canCustomerReturn($order): bool {
+        if (empty($order) || !$order instanceof \WC_Order) {
+            return false;
+        }
+
+        if ('no' === Helper::get_option('lpc_customers_download_return_label', 'no')) {
+            return false;
+        }
+
+        $limitDate = $order->get_date_created();
+        if (empty($limitDate)) {
+            return false;
+        }
+
+        $returnDays = (int) Helper::get_option('lpc_customers_download_return_label_days', 14);
+        $limitDate  = clone $limitDate;
+        $limitDate->add(new \DateInterval('P' . $returnDays . 'D'));
+        if ($limitDate < new \DateTime()) {
+            return false;
+        }
+
+        // If no parcel has been sent, no need for a return label
+        $trackingNumbers = Register::get('outwardLabelDb')->getOrderLabels($order->get_id());
+        if (empty($trackingNumbers)) {
+            return false;
+        }
+
+        $capabilitiesPerCountry = Register::get('capabilitiesPerCountry');
+
+        return false !== $capabilitiesPerCountry->getReturnProductCodeForDestination($order->get_shipping_country());
+    }
+
+    /**
+     * A customer may generate several return labels for one order, but never more than
+     * the number of shippable items they ordered.
+     */
+    public static function canCustomerGenerateInwardLabel($order): bool {
+        if (!self::canCustomerReturn($order)) {
+            return false;
+        }
+
+        $maxLabels = 0;
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            if (!empty($product) && $product->needs_shipping()) {
+                $maxLabels += $item->get_quantity();
+            }
+        }
+
+        $existingLabels = Register::get('inwardLabelDb')->getLabelsInfosForOrdersId([$order->get_id()]);
+
+        return count($existingLabels) < $maxLabels;
+    }
+
+    public static function canCustomerUseMailBoxReturn($order): bool {
+        return self::canCustomerReturn($order)
+               && 'yes' === Helper::get_option('lpc_bal_return', 'no')
+               && 'FR' === $order->get_shipping_country();
     }
 
     public static function getOrderItems(object $order): array {

@@ -197,24 +197,24 @@ class InvoiceGenerateAction {
         $html_output      = '<table><tr>';
         $billing_address2 = '';
         if ($order->get_billing_address_2()) {
-            $billing_address2 = $order->get_billing_address_2() . '<br>';
+            $billing_address2 = esc_html($order->get_billing_address_2()) . '<br>';
         }
         $shipping_address2 = '';
         if ($order->get_shipping_address_2()) {
-            $shipping_address2 = $order->get_shipping_address_2() . '<br>';
+            $shipping_address2 = esc_html($order->get_shipping_address_2()) . '<br>';
         }
 
         // Billing address
         $html_output .= '<td><div>';
         $html_output .= '<span style="font-weight: bold;text-decoration: underline;">' . __('Billing address', 'colissimo-shipping-methods-for-woocommerce') . '</span><br>';
         if (!empty($order->get_billing_company())) {
-            $html_output .= $order->get_billing_company() . '<br>';
+            $html_output .= esc_html($order->get_billing_company()) . '<br>';
         }
-        $html_output .= $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() . '<br>';
-        $html_output .= $order->get_billing_address_1() . '<br>';
-        $html_output .= $billing_address2 . $order->get_billing_postcode() . ' <br>';
-        $html_output .= $order->get_billing_city() . ' <br>';
-        $html_output .= WC()->countries->countries[$order->get_billing_country()] . ' <br>';
+        $html_output .= esc_html($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()) . '<br>';
+        $html_output .= esc_html($order->get_billing_address_1()) . '<br>';
+        $html_output .= $billing_address2;
+        $html_output .= esc_html($order->get_billing_postcode() . ' ' . $order->get_billing_city()) . ' <br>';
+        $html_output .= esc_html(WC()->countries->countries[$order->get_billing_country()] ?? '') . ' <br>';
         $html_output .= '</div></td>';
         $html_output .= '<td></td>';
 
@@ -222,13 +222,13 @@ class InvoiceGenerateAction {
         $html_output .= '<td><div style="float:right;">';
         $html_output .= '<span style="font-weight: bold;text-decoration: underline;">' . __('Shipping address', 'colissimo-shipping-methods-for-woocommerce') . '</span><br>';
         if (!empty($order->get_shipping_company())) {
-            $html_output .= $order->get_shipping_company() . '<br>';
+            $html_output .= esc_html($order->get_shipping_company()) . '<br>';
         }
-        $html_output .= $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name() . '<br>';
-        $html_output .= $order->get_shipping_address_1() . '<br>';
-        $html_output .= $shipping_address2 . $order->get_shipping_postcode() . ' <br>';
-        $html_output .= $order->get_shipping_city() . ' <br>';
-        $html_output .= WC()->countries->countries[$order->get_shipping_country()] . ' <br>';
+        $html_output .= esc_html($order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name()) . '<br>';
+        $html_output .= esc_html($order->get_shipping_address_1()) . '<br>';
+        $html_output .= $shipping_address2;
+        $html_output .= esc_html($order->get_shipping_postcode() . ' ' . $order->get_shipping_city()) . ' <br>';
+        $html_output .= esc_html(WC()->countries->countries[$order->get_shipping_country()] ?? '') . ' <br>';
         $html_output .= '</div></td>';
 
         $html_output .= '</tr></table>';
@@ -239,7 +239,7 @@ class InvoiceGenerateAction {
     protected function printStoreInformationInHTML(WC_Order $order) {
         $store_address2 = '';
         if (get_option('woocommerce_store_address_2')) {
-            $store_address2 = get_option('woocommerce_store_address_2') . '<br>';
+            $store_address2 = esc_html(get_option('woocommerce_store_address_2')) . '<br>';
         }
 
         $vatNumberOutput = '';
@@ -253,12 +253,12 @@ class InvoiceGenerateAction {
             }
         }
 
-        $output_html = '<div><span style="font-weight: bold;font-size: 1.2em;">' . Helper::get_option('lpc_origin_company_name', '') . '</span><br>';
-        $output_html .= get_option('woocommerce_store_address') . '<br>';
-        $output_html .= $store_address2 . get_option('woocommerce_store_postcode') . ' <br>';
-        $output_html .= get_option('woocommerce_store_city') . ' <br>';
-        $output_html .= WC()->countries->countries[get_option('woocommerce_default_country')] . ' <br>';
-        $output_html .= $vatNumberOutput . '</div>';
+        $output_html = '<div><span style="font-weight: bold;font-size: 1.2em;">' . esc_html(Helper::get_option('lpc_origin_company_name', '')) . '</span><br>';
+        $output_html .= esc_html(get_option('woocommerce_store_address')) . '<br>';
+        $output_html .= $store_address2;
+        $output_html .= esc_html(get_option('woocommerce_store_postcode') . ' ' . get_option('woocommerce_store_city')) . ' <br>';
+        $output_html .= esc_html(WC()->countries->countries[get_option('woocommerce_default_country')] ?? '') . ' <br>';
+        $output_html .= esc_html($vatNumberOutput) . '</div>';
 
         return $output_html;
     }

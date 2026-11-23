@@ -188,7 +188,13 @@ class Table extends WP_List_Table {
     }
 
     protected function column_default($item, $column_name) {
-        return $item[$column_name];
+        if ('lpc-address' === $column_name) {
+            return wp_kses($item[$column_name], ['br' => []]);
+        }
+
+        $htmlColumns = ['cb', 'lpc-id', 'lpc-label'];
+
+        return in_array($column_name, $htmlColumns, true) ? $item[$column_name] : esc_html($item[$column_name]);
     }
 
     protected function get_data($current_page = 0, $per_page = 0, $args = [], $filters = []): array {
@@ -227,10 +233,10 @@ class Table extends WP_List_Table {
                     $labels .= '<span class="dashicons dashicons-warning lpc_outward_label_error_icon"></span>';
                     $labels .= sprintf(
                     // translators: %s is the error message returned by the API.
-                        __('The label couldn\'t be generated: %s', 'colissimo-shipping-methods-for-woocommerce'),
+                        esc_html__('The label couldn\'t be generated: %s', 'colissimo-shipping-methods-for-woocommerce'),
                         // English message saved in database to display the correct language to the current user
                         // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralText
-                        __($ordersOutwardFailed[$orderId]['message'], 'colissimo-shipping-methods-for-woocommerce')
+                        esc_html(__($ordersOutwardFailed[$orderId]['message'], 'colissimo-shipping-methods-for-woocommerce'))
                     );
                     $labels .= '</div><br>';
                 }
@@ -298,7 +304,7 @@ class Table extends WP_List_Table {
 
         $orderUrl = $order->get_edit_order_url();
 
-        return '<a href="' . $orderUrl . '">' . $orderId . '</a>';
+        return '<a href="' . esc_url($orderUrl) . '">' . esc_html($orderId) . '</a>';
     }
 
     public function column_cb($item) {
